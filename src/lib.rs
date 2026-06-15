@@ -1,3 +1,4 @@
+mod custom_material;
 mod example_scene;
 mod settings;
 
@@ -9,7 +10,7 @@ use bevy::{
     window::{PresentMode, WindowResolution},
 };
 
-use crate::example_scene::ExampleScenePlugin;
+use crate::{custom_material::CustomMaterial, example_scene::ExampleScenePlugin};
 
 pub fn run() {
     let mut app = App::new();
@@ -35,6 +36,7 @@ pub fn run() {
     // thirdparty plugins
     // local plugins
     .add_plugins(ExampleScenePlugin)
+    .add_plugins(MaterialPlugin::<CustomMaterial>::default())
     .insert_resource(ClearColor(Color::srgb(0.1, 0.1, 0.1)))
     .insert_resource(Time::<Fixed>::from_hz(60.))
     .run();

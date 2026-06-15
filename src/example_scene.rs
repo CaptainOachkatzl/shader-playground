@@ -2,6 +2,8 @@ use std::f32::consts::PI;
 
 use bevy::{mesh::CircleMeshBuilder, prelude::*};
 
+use crate::custom_material::{ATTRIBUTE_BLEND_COLOR, CustomMaterial};
+
 pub struct ExampleScenePlugin;
 
 impl Plugin for ExampleScenePlugin {
@@ -15,18 +17,41 @@ impl Plugin for ExampleScenePlugin {
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut standard_materials: ResMut<Assets<StandardMaterial>>,
+    mut custom_materials: ResMut<Assets<CustomMaterial>>,
 ) {
     // circular base
     commands.spawn((
         Mesh3d(meshes.add(CircleMeshBuilder::new(4.0, 256))),
-        MeshMaterial3d(materials.add(Color::WHITE)),
+        MeshMaterial3d(standard_materials.add(Color::WHITE)),
         Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
     ));
+
+    // The cube mesh has 24 vertices (6 faces, 4 vertices per face), so we insert one BlendColor for each
+    let colors: Vec<_> = (0..24)
+        .map(|index| {
+            let index_float = index as f32;
+            let color = match index {
+                0..8 => [index_float / 8.0, 0.0, 0.0, 1.0],
+                8..16 => [0.0, (index_float - 8.0) / 8.0, 0.0, 1.0],
+                16..24 => [0.0, 0.0, (index_float - 16.0) / 8.0, 1.0],
+                _ => unreachable!(),
+            };
+            println!("{:?}", color);
+
+            color
+        })
+        .collect();
+
     // cube
+    let mesh = Mesh::from(Cuboid::new(1.0, 1.0, 1.0))
+        .with_inserted_attribute(ATTRIBUTE_BLEND_COLOR, colors);
+
     commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        Mesh3d(meshes.add(mesh)),
+        MeshMaterial3d(custom_materials.add(CustomMaterial {
+            color: LinearRgba::WHITE,
+        })),
         Transform::from_xyz(0.0, 0.5, 0.0),
     ));
     // light
