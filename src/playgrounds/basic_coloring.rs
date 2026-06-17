@@ -2,14 +2,20 @@ use std::f32::consts::PI;
 
 use bevy::{mesh::CircleMeshBuilder, prelude::*};
 
-use crate::custom_material::{ATTRIBUTE_BLEND_COLOR, CustomMaterial};
+use crate::{
+    custom_material::{ATTRIBUTE_BLEND_COLOR, CustomMaterial},
+    playgrounds::PlaygroundScene,
+};
 
-pub struct ExampleScenePlugin;
+pub struct BasicColoringPlugin;
 
-impl Plugin for ExampleScenePlugin {
+impl Plugin for BasicColoringPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, circle_camera);
+        app.add_systems(OnEnter(PlaygroundScene::BasicColoring), setup)
+            .add_systems(
+                Update,
+                circle_camera.run_if(in_state(PlaygroundScene::BasicColoring)),
+            );
     }
 }
 
@@ -30,13 +36,11 @@ fn setup(
     // The cube mesh has 24 vertices (6 faces, 4 vertices per face), so we insert one BlendColor for each
     let colors: Vec<_> = (0..24)
         .map(|index| {
-            let index_float = index as f32;
-            let color = match index {
-                0..8 => [index_float / 8.0, 0.0, 0.0, 1.0],
-                8..16 => [0.0, (index_float - 8.0) / 8.0, 0.0, 1.0],
-                16..24 => [0.0, 0.0, (index_float - 16.0) / 8.0, 1.0],
-                _ => unreachable!(),
-            };
+            // use HSV color space to circle between red, green and blue.
+            // advancing by 120 degrees shifts to the next base color, starting with red at 0 degrees.
+            let color =
+                Into::<LinearRgba>::into(Hsva::new(index as f32 * 120.0 % 360.0, 1.0, 1.0, 1.0))
+                    .to_f32_array();
             println!("{:?}", color);
 
             color
@@ -70,7 +74,7 @@ fn setup(
 }
 
 fn circle_camera(time: Res<Time<Real>>, mut cam_q: Query<&mut Transform, With<Camera3d>>) {
-    const CIRCLE_PERIOD: f32 = 10.0;
+    const CIRCLE_PERIOD: f32 = 30.0;
 
     for mut transform in cam_q.iter_mut() {
         let rotation = Quat::from_rotation_y(2.0 * PI * time.delta_secs() / CIRCLE_PERIOD);

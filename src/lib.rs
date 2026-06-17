@@ -1,5 +1,5 @@
 mod custom_material;
-mod example_scene;
+mod playgrounds;
 mod settings;
 
 #[allow(unused)]
@@ -10,7 +10,7 @@ use bevy::{
     window::{PresentMode, WindowResolution},
 };
 
-use crate::{custom_material::CustomMaterial, example_scene::ExampleScenePlugin};
+use crate::{custom_material::CustomMaterial, playgrounds::basic_coloring::BasicColoringPlugin};
 
 pub fn run() {
     let mut app = App::new();
@@ -35,8 +35,9 @@ pub fn run() {
     // .add_plugins((LogDiagnosticsPlugin::default(), FrameTimeDiagnosticsPlugin::default()))
     // thirdparty plugins
     // local plugins
-    .add_plugins(ExampleScenePlugin)
+    .add_plugins(BasicColoringPlugin)
     .add_plugins(MaterialPlugin::<CustomMaterial>::default())
+    .init_state::<playgrounds::PlaygroundScene>()
     .insert_resource(ClearColor(Color::srgb(0.1, 0.1, 0.1)))
     .insert_resource(Time::<Fixed>::from_hz(60.))
     .run();
