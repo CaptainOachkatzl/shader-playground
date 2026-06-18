@@ -1,7 +1,10 @@
 use bevy::{
-    mesh::{CircleMeshBuilder, MeshVertexAttribute, MeshVertexBufferLayoutRef, VertexFormat},
-    pbr::{MaterialPipeline, MaterialPipelineKey},
+    asset::Asset,
+    mesh::CircleMeshBuilder,
+    mesh::{Mesh, MeshVertexAttribute, MeshVertexBufferLayoutRef, VertexFormat},
+    pbr::{Material, MaterialPipeline, MaterialPipelineKey},
     prelude::*,
+    reflect::TypePath,
     render::render_resource::{
         AsBindGroup, RenderPipelineDescriptor, SpecializedMeshPipelineError,
     },
@@ -10,12 +13,12 @@ use bevy::{
 
 use crate::playgrounds::PlaygroundScene;
 
-pub struct BasicColoringPlugin;
+pub struct PaintCubeFacePlugin;
 
-impl Plugin for BasicColoringPlugin {
+impl Plugin for PaintCubeFacePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(PlaygroundScene::BasicColoring), setup)
-            .add_systems(OnExit(PlaygroundScene::BasicColoring), cleanup);
+        app.add_systems(OnEnter(PlaygroundScene::PaintCubeFace), setup)
+            .add_systems(OnExit(PlaygroundScene::PaintCubeFace), cleanup);
     }
 }
 
@@ -27,7 +30,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut standard_materials: ResMut<Assets<StandardMaterial>>,
-    mut custom_materials: ResMut<Assets<BasicColoringMaterial>>,
+    mut custom_materials: ResMut<Assets<PaintFaceMaterial>>,
 ) {
     let root = commands
         .spawn((SceneRoot, Transform::default(), Visibility::Visible))
@@ -41,32 +44,21 @@ fn setup(
             Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
         ));
 
-        // The cube mesh has 24 vertices (6 faces, 4 vertices per face), so we insert one BlendColor for each
-        let colors: Vec<_> = (0..24)
-            .map(|index| {
-                // use HSV color space to circle between red, green and blue.
-                // advancing by 120 degrees shifts to the next base color, starting with red at 0 degrees.
-                let color = Into::<LinearRgba>::into(Hsva::new(
-                    index as f32 * 120.0 % 360.0,
-                    1.0,
-                    1.0,
-                    1.0,
-                ))
-                .to_f32_array();
+        let mut face_ids = Vec::new();
 
-                color
-            })
-            .collect();
+        for face in 0..6u32 {
+            for _ in 0..4 {
+                face_ids.push(face);
+            }
+        }
 
         // cube
         let mesh = Mesh::from(Cuboid::new(1.0, 1.0, 1.0))
-            .with_inserted_attribute(ATTRIBUTE_BLEND_COLOR, colors);
+            .with_inserted_attribute(ATTRIBUTE_FACE_ID, face_ids);
 
         parent.spawn((
             Mesh3d(meshes.add(mesh)),
-            MeshMaterial3d(custom_materials.add(BasicColoringMaterial {
-                color: LinearRgba::WHITE,
-            })),
+            MeshMaterial3d(custom_materials.add(PaintFaceMaterial {})),
             Transform::from_xyz(0.0, 0.5, 0.0),
         ));
         // light
@@ -84,20 +76,15 @@ fn cleanup(mut commands: Commands, root: Query<Entity, With<SceneRoot>>) {
     commands.entity(root.single().unwrap()).despawn();
 }
 
-const SHADER_PATH: &str = "shaders/custom_shader.wgsl";
+const SHADER_PATH: &str = "shaders/paint_cube_face.wgsl";
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-pub struct BasicColoringMaterial {
-    #[uniform(0)]
-    pub color: LinearRgba,
-}
+pub struct PaintFaceMaterial {}
 
-// A "high" random id should be used for custom attributes to ensure consistent sorting and avoid collisions with other attributes.
-// See the MeshVertexAttribute docs for more info.
-pub const ATTRIBUTE_BLEND_COLOR: MeshVertexAttribute =
-    MeshVertexAttribute::new("BlendColor", 988540917, VertexFormat::Float32x4);
+const ATTRIBUTE_FACE_ID: MeshVertexAttribute =
+    MeshVertexAttribute::new("FaceId", 987654322, VertexFormat::Uint32);
 
-impl Material for BasicColoringMaterial {
+impl Material for PaintFaceMaterial {
     fn vertex_shader() -> ShaderRef {
         SHADER_PATH.into()
     }
@@ -113,7 +100,9 @@ impl Material for BasicColoringMaterial {
     ) -> Result<(), SpecializedMeshPipelineError> {
         let vertex_layout = layout.0.get_layout(&[
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
-            ATTRIBUTE_BLEND_COLOR.at_shader_location(1),
+            Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
+            Mesh::ATTRIBUTE_UV_0.at_shader_location(2),
+            ATTRIBUTE_FACE_ID.at_shader_location(3),
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())

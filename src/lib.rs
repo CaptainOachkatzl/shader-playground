@@ -1,5 +1,4 @@
 pub mod camera;
-mod custom_material;
 mod playgrounds;
 mod settings;
 
@@ -13,8 +12,11 @@ use bevy::{
 
 use crate::{
     camera::CameraPlugin,
-    custom_material::CustomMaterial,
-    playgrounds::{ScenePlugin, basic_coloring::BasicColoringPlugin, test::TestPlugin},
+    playgrounds::{
+        ScenePlugin,
+        basic_coloring::{BasicColoringMaterial, BasicColoringPlugin},
+        paint_cube_face::{PaintCubeFacePlugin, PaintFaceMaterial},
+    },
 };
 
 pub fn run() {
@@ -41,8 +43,11 @@ pub fn run() {
     // thirdparty plugins
     // local plugins
     .add_plugins((CameraPlugin, ScenePlugin))
-    .add_plugins((BasicColoringPlugin, TestPlugin))
-    .add_plugins(MaterialPlugin::<CustomMaterial>::default())
+    .add_plugins((BasicColoringPlugin, PaintCubeFacePlugin))
+    .add_plugins((
+        MaterialPlugin::<BasicColoringMaterial>::default(),
+        MaterialPlugin::<PaintFaceMaterial>::default(),
+    ))
     .insert_resource(ClearColor(Color::srgb(0.1, 0.1, 0.1)))
     .insert_resource(Time::<Fixed>::from_hz(60.))
     .run();

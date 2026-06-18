@@ -1,5 +1,5 @@
 pub mod basic_coloring;
-pub mod test;
+pub mod paint_cube_face;
 
 use bevy::prelude::*;
 
@@ -7,7 +7,7 @@ use bevy::prelude::*;
 pub enum PlaygroundScene {
     #[default]
     BasicColoring,
-    Test,
+    PaintCubeFace,
 }
 
 pub struct ScenePlugin;
@@ -26,6 +26,6 @@ fn switch_scenes(
     if key_input.just_pressed(KeyCode::Digit1) {
         state.set(PlaygroundScene::BasicColoring);
     } else if key_input.just_pressed(KeyCode::Digit2) {
-        state.set(PlaygroundScene::Test);
+        state.set(PlaygroundScene::PaintCubeFace);
     }
 }
