@@ -5,12 +5,12 @@ use crate::{
     playgrounds::PlaygroundScene,
 };
 
-pub struct BasicColoringPlugin;
+pub struct TestPlugin;
 
-impl Plugin for BasicColoringPlugin {
+impl Plugin for TestPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(PlaygroundScene::BasicColoring), setup)
-            .add_systems(OnExit(PlaygroundScene::BasicColoring), cleanup);
+        app.add_systems(OnEnter(PlaygroundScene::Test), setup)
+            .add_systems(OnExit(PlaygroundScene::Test), cleanup);
     }
 }
 
@@ -38,16 +38,10 @@ fn setup(
 
         // The cube mesh has 24 vertices (6 faces, 4 vertices per face), so we insert one BlendColor for each
         let colors: Vec<_> = (0..24)
-            .map(|index| {
+            .map(|_| {
                 // use HSV color space to circle between red, green and blue.
                 // advancing by 120 degrees shifts to the next base color, starting with red at 0 degrees.
-                let color = Into::<LinearRgba>::into(Hsva::new(
-                    index as f32 * 120.0 % 360.0,
-                    1.0,
-                    1.0,
-                    1.0,
-                ))
-                .to_f32_array();
+                let color = Into::<LinearRgba>::into(Hsva::new(0.0, 1.0, 1.0, 1.0)).to_f32_array();
 
                 color
             })
