@@ -3,7 +3,7 @@
 struct VertexInput {
     @builtin(instance_index) instance_index: u32,
     @location(0) position: vec3<f32>,
-    @location(3) face_id: u32,
+    @location(1) face_id: u32,
 };
 
 struct VertexOutput {
