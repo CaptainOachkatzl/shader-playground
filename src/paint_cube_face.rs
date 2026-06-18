@@ -19,9 +19,6 @@ impl Plugin for PaintCubeFacePlugin {
     }
 }
 
-#[derive(Component)]
-struct SceneRoot;
-
 /// set up a simple 3D scene
 fn setup(
     mut commands: Commands,
@@ -29,49 +26,39 @@ fn setup(
     mut standard_materials: ResMut<Assets<StandardMaterial>>,
     mut custom_materials: ResMut<Assets<PaintFaceMaterial>>,
 ) {
-    let root = commands
-        .spawn((SceneRoot, Transform::default(), Visibility::Visible))
-        .id();
+    // circular base
+    commands.spawn((
+        Mesh3d(meshes.add(CircleMeshBuilder::new(4.0, 256))),
+        MeshMaterial3d(standard_materials.add(Color::WHITE)),
+        Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+    ));
 
-    commands.entity(root).with_children(|parent| {
-        // circular base
-        parent.spawn((
-            Mesh3d(meshes.add(CircleMeshBuilder::new(4.0, 256))),
-            MeshMaterial3d(standard_materials.add(Color::WHITE)),
-            Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-        ));
+    // cube
+    let mut face_ids = Vec::new();
 
-        // cube
-        let mut face_ids = Vec::new();
-
-        // bevy cuboid is created with 4 vertices for each face
-        for face in 0..6u32 {
-            for _ in 0..4 {
-                face_ids.push(face);
-            }
+    // bevy cuboid is created with 4 vertices for each face
+    for face in 0..6u32 {
+        for _ in 0..4 {
+            face_ids.push(face);
         }
+    }
 
-        let mesh = Mesh::from(Cuboid::new(1.0, 1.0, 1.0))
-            .with_inserted_attribute(ATTRIBUTE_FACE_ID, face_ids);
+    let mesh =
+        Mesh::from(Cuboid::new(1.0, 1.0, 1.0)).with_inserted_attribute(ATTRIBUTE_FACE_ID, face_ids);
 
-        for attr in mesh.attributes() {
-            info!("{:?}", attr);
-        }
-
-        parent.spawn((
-            Mesh3d(meshes.add(mesh)),
-            MeshMaterial3d(custom_materials.add(PaintFaceMaterial {})),
-            Transform::from_xyz(0.0, 0.5, 0.0),
-        ));
-        // light
-        parent.spawn((
-            PointLight {
-                shadows_enabled: true,
-                ..default()
-            },
-            Transform::from_xyz(4.0, 8.0, 4.0),
-        ));
-    });
+    commands.spawn((
+        Mesh3d(meshes.add(mesh)),
+        MeshMaterial3d(custom_materials.add(PaintFaceMaterial {})),
+        Transform::from_xyz(0.0, 0.5, 0.0),
+    ));
+    // light
+    commands.spawn((
+        PointLight {
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
 }
 
 const SHADER_PATH: &str = "shaders/paint_cube_face.wgsl";
