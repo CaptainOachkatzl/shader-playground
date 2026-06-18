@@ -44,15 +44,16 @@ fn setup(
             Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
         ));
 
+        // cube
         let mut face_ids = Vec::new();
 
+        // bevy cuboid is created with 4 vertices for each face
         for face in 0..6u32 {
             for _ in 0..4 {
                 face_ids.push(face);
             }
         }
 
-        // cube
         let mesh = Mesh::from(Cuboid::new(1.0, 1.0, 1.0))
             .with_inserted_attribute(ATTRIBUTE_FACE_ID, face_ids);
 
