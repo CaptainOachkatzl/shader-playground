@@ -11,14 +11,11 @@ use bevy::{
     shader::ShaderRef,
 };
 
-use crate::playgrounds::PlaygroundScene;
-
 pub struct PaintCubeFacePlugin;
 
 impl Plugin for PaintCubeFacePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(PlaygroundScene::PaintCubeFace), setup)
-            .add_systems(OnExit(PlaygroundScene::PaintCubeFace), cleanup);
+        app.add_systems(Startup, setup);
     }
 }
 
@@ -57,6 +54,10 @@ fn setup(
         let mesh = Mesh::from(Cuboid::new(1.0, 1.0, 1.0))
             .with_inserted_attribute(ATTRIBUTE_FACE_ID, face_ids);
 
+        for attr in mesh.attributes() {
+            info!("{:?}", attr);
+        }
+
         parent.spawn((
             Mesh3d(meshes.add(mesh)),
             MeshMaterial3d(custom_materials.add(PaintFaceMaterial {})),
@@ -71,10 +72,6 @@ fn setup(
             Transform::from_xyz(4.0, 8.0, 4.0),
         ));
     });
-}
-
-fn cleanup(mut commands: Commands, root: Query<Entity, With<SceneRoot>>) {
-    commands.entity(root.single().unwrap()).despawn();
 }
 
 const SHADER_PATH: &str = "shaders/paint_cube_face.wgsl";
