@@ -24,10 +24,6 @@ fn vertex(in: VertexInput) -> VertexOutput {
     return out;
 }
 
-struct FragmentInput {
-    @location(0) face_id: u32,
-};
-
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     switch in.face_id {
