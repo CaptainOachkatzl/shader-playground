@@ -8,7 +8,7 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) face_id: u32,
+    @location(0) @interpolate(flat) face_id: u32,
 };
 
 @vertex
