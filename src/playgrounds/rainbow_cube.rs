@@ -1,7 +1,7 @@
 use bevy::{
     asset::Asset,
     mesh::CircleMeshBuilder,
-    mesh::{Mesh, MeshVertexAttribute, MeshVertexBufferLayoutRef, VertexFormat},
+    mesh::{Mesh, MeshVertexBufferLayoutRef},
     pbr::{Material, MaterialPipeline, MaterialPipelineKey},
     prelude::*,
     reflect::TypePath,
@@ -54,9 +54,7 @@ fn setup(
             }
         }
 
-        let mesh = Mesh::from(Cuboid::new(1.0, 1.0, 1.0))
-            .with_inserted_attribute(ATTRIBUTE_FACE_ID, face_ids);
-
+        let mesh = Mesh::from(Cuboid::new(1.0, 1.0, 1.0));
         parent.spawn((
             Mesh3d(meshes.add(mesh)),
             MeshMaterial3d(custom_materials.add(RainbowCubeMaterial {})),
@@ -82,9 +80,6 @@ const SHADER_PATH: &str = "shaders/rainbow_cube.wgsl";
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct RainbowCubeMaterial {}
 
-const ATTRIBUTE_FACE_ID: MeshVertexAttribute =
-    MeshVertexAttribute::new("FaceId", 987654322, VertexFormat::Uint32);
-
 impl Material for RainbowCubeMaterial {
     fn vertex_shader() -> ShaderRef {
         SHADER_PATH.into()
@@ -103,7 +98,6 @@ impl Material for RainbowCubeMaterial {
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
             Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
             Mesh::ATTRIBUTE_UV_0.at_shader_location(2),
-            ATTRIBUTE_FACE_ID.at_shader_location(3),
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())
