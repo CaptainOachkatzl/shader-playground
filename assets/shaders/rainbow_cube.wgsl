@@ -1,11 +1,10 @@
 #import bevy_pbr::mesh_functions::{get_world_from_local, mesh_position_local_to_clip}
 
-// struct Animation {
-//     // a value between 0.0 and 1.0 to indicate how far the animation has progressed
-//     progress: f32,
-//     frequency: f32,
-// };
-// @group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> material: Animation;
+struct Material {
+    // a value between 0.0 and 1.0 to indicate how far the animation has progressed
+    animation_progress: f32,
+};
+@group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> material: Material;
 
 struct VertexInput {
     @builtin(instance_index) instance_index: u32,
@@ -36,7 +35,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     const PI: f32 = 3.141592;
     const frequency: f32 = 10.0;
     let normalized_y = in.local_y + 0.5;
-    let hsv = vec3<f32>(normalized_y * frequency, 1, 1);
+    let hsv = vec3<f32>((normalized_y - material.animation_progress), 1, 1);
     return vec4<f32>(hsv_to_rgb(hsv), 1.0);
 }
 
