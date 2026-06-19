@@ -32,7 +32,6 @@ fn vertex(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    const PI: f32 = 3.141592;
     const frequency: f32 = 10.0;
     let normalized_y = in.local_y + 0.5;
     let hsv = vec3<f32>((normalized_y - material.animation_progress), 1, 1);
