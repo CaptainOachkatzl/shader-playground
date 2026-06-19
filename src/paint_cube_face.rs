@@ -51,14 +51,6 @@ fn setup(
         MeshMaterial3d(custom_materials.add(PaintFaceMaterial {})),
         Transform::from_xyz(0.0, 0.5, 0.0),
     ));
-    // light
-    commands.spawn((
-        PointLight {
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_xyz(4.0, 8.0, 4.0),
-    ));
 }
 
 const SHADER_PATH: &str = "shaders/paint_cube_face.wgsl";
