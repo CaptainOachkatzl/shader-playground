@@ -2,12 +2,22 @@ pub mod basic_coloring;
 pub mod paint_cube_face;
 
 use bevy::prelude::*;
+use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(States, EnumIter, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum PlaygroundScene {
     #[default]
     BasicColoring,
     PaintCubeFace,
+}
+
+impl PlaygroundScene {
+    fn get_key_code(&self) -> KeyCode {
+        match self {
+            PlaygroundScene::BasicColoring => KeyCode::Digit1,
+            PlaygroundScene::PaintCubeFace => KeyCode::Digit2,
+        }
+    }
 }
 
 pub struct ScenePlugin;
@@ -23,9 +33,10 @@ fn switch_scenes(
     key_input: Res<ButtonInput<KeyCode>>,
     mut state: ResMut<NextState<PlaygroundScene>>,
 ) {
-    if key_input.just_pressed(KeyCode::Digit1) {
-        state.set(PlaygroundScene::BasicColoring);
-    } else if key_input.just_pressed(KeyCode::Digit2) {
-        state.set(PlaygroundScene::PaintCubeFace);
+    for scene in PlaygroundScene::iter() {
+        if key_input.just_pressed(scene.get_key_code()) {
+            state.set(scene);
+            return;
+        }
     }
 }
