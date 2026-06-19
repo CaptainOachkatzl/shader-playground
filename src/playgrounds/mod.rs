@@ -1,5 +1,6 @@
 pub mod basic_coloring;
 pub mod paint_cube_face;
+pub mod rainbow_cube;
 
 use bevy::prelude::*;
 use strum::{EnumIter, IntoEnumIterator};
@@ -9,6 +10,7 @@ pub enum PlaygroundScene {
     #[default]
     BasicColoring,
     PaintCubeFace,
+    RainbowCube,
 }
 
 impl PlaygroundScene {
@@ -16,6 +18,7 @@ impl PlaygroundScene {
         match self {
             PlaygroundScene::BasicColoring => KeyCode::Digit1,
             PlaygroundScene::PaintCubeFace => KeyCode::Digit2,
+            PlaygroundScene::RainbowCube => KeyCode::Digit3,
         }
     }
 }
