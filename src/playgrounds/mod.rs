@@ -38,7 +38,7 @@ fn switch_scenes(
 ) {
     for scene in PlaygroundScene::iter() {
         if key_input.just_pressed(scene.get_key_code()) {
-            state.set(scene);
+            NextState::set_if_neq(&mut state, scene);
             return;
         }
     }
