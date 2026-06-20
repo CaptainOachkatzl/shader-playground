@@ -18,7 +18,6 @@ pub struct RainbowCubePlugin;
 impl Plugin for RainbowCubePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(PlaygroundScene::RainbowCube), setup)
-            .add_systems(OnExit(PlaygroundScene::RainbowCube), cleanup)
             .add_systems(
                 Update,
                 update.run_if(in_state(PlaygroundScene::RainbowCube)),
@@ -26,15 +25,12 @@ impl Plugin for RainbowCubePlugin {
     }
 }
 
-#[derive(Component, Default, Clone, Copy)]
-struct SceneRoot;
-
 /// set up a simple 3D scene
 fn setup(mut commands: Commands) {
     let scene = bsn! {
-        SceneRoot
         Visibility::Visible
         Transform
+        DespawnOnExit<PlaygroundScene>(PlaygroundScene::RainbowCube)
         Children [
             // circular base
             Mesh3d(asset_value(CircleMeshBuilder::new(4.0, 256)))
@@ -58,10 +54,6 @@ fn setup(mut commands: Commands) {
     };
 
     commands.spawn_scene(scene);
-}
-
-fn cleanup(mut commands: Commands, root: Query<Entity, With<SceneRoot>>) {
-    commands.entity(root.single().unwrap()).despawn();
 }
 
 fn update(time: Res<Time>, mut custom_materials: ResMut<Assets<RainbowCubeMaterial>>) {
