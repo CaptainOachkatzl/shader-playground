@@ -26,46 +26,38 @@ impl Plugin for RainbowCubePlugin {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Default, Clone, Copy)]
 struct SceneRoot;
 
 /// set up a simple 3D scene
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut standard_materials: ResMut<Assets<StandardMaterial>>,
-    mut custom_materials: ResMut<Assets<RainbowCubeMaterial>>,
-) {
-    let root = commands
-        .spawn((SceneRoot, Transform::default(), Visibility::Visible))
-        .id();
-
-    commands.entity(root).with_children(|parent| {
-        // circular base
-        parent.spawn((
-            Mesh3d(meshes.add(CircleMeshBuilder::new(4.0, 256))),
-            MeshMaterial3d(standard_materials.add(Color::WHITE)),
+fn setup(mut commands: Commands) {
+    let scene = bsn! {
+        SceneRoot
+        Visibility::Visible
+        Transform
+        Children [
+            // circular base
+            Mesh3d(asset_value(CircleMeshBuilder::new(4.0, 256)))
+            MeshMaterial3d::<StandardMaterial>(asset_value(Color::WHITE))
             Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-        ));
 
-        // cube
-        let mesh = Mesh::from(Cuboid::new(1.0, 1.0, 1.0));
-        parent.spawn((
-            Mesh3d(meshes.add(mesh)),
-            MeshMaterial3d(custom_materials.add(RainbowCubeMaterial {
+            // cube
+            Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
+            MeshMaterial3d::<RainbowCubeMaterial>(asset_value(RainbowCubeMaterial {
                 animation_progress: 0.0,
-            })),
+            }))
             Transform::from_xyz(0.0, 0.5, 0.0),
-        ));
-        // light
-        parent.spawn((
+
+            // light
             PointLight {
                 shadow_maps_enabled: true,
-                ..default()
-            },
+            }
             Transform::from_xyz(4.0, 8.0, 4.0),
-        ));
-    });
+        ]
+
+    };
+
+    commands.spawn_scene(scene);
 }
 
 fn cleanup(mut commands: Commands, root: Query<Entity, With<SceneRoot>>) {
