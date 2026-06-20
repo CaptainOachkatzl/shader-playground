@@ -19,7 +19,12 @@ impl Plugin for RainbowCubePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             OnEnter(PlaygroundScene::RainbowCube),
-            (setup, test_setup).chain(),
+            (
+                setup,
+                bevy::asset::handle_internal_asset_events,
+                test_setup,
+            )
+                .chain(),
         )
         .add_systems(
             Update,
