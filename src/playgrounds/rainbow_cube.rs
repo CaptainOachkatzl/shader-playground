@@ -22,6 +22,18 @@ impl Plugin for RainbowCubePlugin {
                 Update,
                 update.run_if(in_state(PlaygroundScene::RainbowCube)),
             );
+        app.add_systems(
+            OnEnter(PlaygroundScene::RainbowCube),
+            (
+                setup,
+                bevy::asset::handle_internal_asset_events,
+            )
+                .chain(),
+        )
+        .add_systems(
+            Update,
+            update.run_if(in_state(PlaygroundScene::RainbowCube)),
+        );
     }
 }
 
