@@ -17,17 +17,45 @@ pub struct RainbowCubePlugin;
 
 impl Plugin for RainbowCubePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(PlaygroundScene::RainbowCube), setup)
-            .add_systems(
-                Update,
-                update.run_if(in_state(PlaygroundScene::RainbowCube)),
-            );
+        app.add_systems(
+            OnEnter(PlaygroundScene::RainbowCube),
+            (setup, test_setup).chain(),
+        )
+        .add_systems(
+            Update,
+            update.run_if(in_state(PlaygroundScene::RainbowCube)),
+        );
     }
 }
 
-/// set up a simple 3D scene
+#[derive(Component, Default, Clone)]
+struct SceneRoot;
+
+#[derive(Component, Default, Clone)]
+struct Debug;
+
 fn setup(mut commands: Commands) {
-    let scene = bsn! {
+    commands.spawn_scene(create_scene());
+}
+
+fn test_setup(
+    meshes: Res<Assets<Mesh>>,
+    name_q: Query<&Name, With<SceneRoot>>,
+    debug_q: Query<&Mesh3d, With<Debug>>,
+) {
+    for name in name_q {
+        println!("{:?}", name);
+    }
+
+    for handle in debug_q {
+        println!("{:?}", meshes.get(&handle.0));
+    }
+}
+
+fn create_scene() -> impl Scene {
+    bsn! {
+        #MyScene
+        SceneRoot
         Visibility::Visible
         Transform
         DespawnOnExit<PlaygroundScene>(PlaygroundScene::RainbowCube)
@@ -38,6 +66,7 @@ fn setup(mut commands: Commands) {
             Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
 
             // cube
+            Debug
             Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
             MeshMaterial3d::<RainbowCubeMaterial>(asset_value(RainbowCubeMaterial {
                 animation_progress: 0.0,
@@ -51,9 +80,7 @@ fn setup(mut commands: Commands) {
             Transform::from_xyz(4.0, 8.0, 4.0),
         ]
 
-    };
-
-    commands.spawn_scene(scene);
+    }
 }
 
 fn update(time: Res<Time>, mut custom_materials: ResMut<Assets<RainbowCubeMaterial>>) {
