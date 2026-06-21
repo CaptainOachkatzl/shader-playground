@@ -15,8 +15,9 @@ use crate::{
     playgrounds::{
         ScenePlugin,
         basic_coloring::{BasicColoringMaterial, BasicColoringPlugin},
+        hologram::{HologramMaterial, HologramPlugin},
         paint_cube_face::{PaintCubeFacePlugin, PaintFaceMaterial},
-        rainbow_cube::{RainbowMaterial, RainbowCubePlugin},
+        rainbow_cube::{RainbowCubePlugin, RainbowMaterial},
     },
 };
 
@@ -44,11 +45,12 @@ pub fn run() {
     // thirdparty plugins
     // local plugins
     .add_plugins((CameraPlugin, ScenePlugin))
-    .add_plugins((BasicColoringPlugin, PaintCubeFacePlugin, RainbowCubePlugin))
+    .add_plugins((BasicColoringPlugin, PaintCubeFacePlugin, RainbowCubePlugin, HologramPlugin))
     .add_plugins((
         MaterialPlugin::<BasicColoringMaterial>::default(),
         MaterialPlugin::<PaintFaceMaterial>::default(),
         MaterialPlugin::<RainbowMaterial>::default(),
+        MaterialPlugin::<HologramMaterial>::default(),
     ))
     .insert_resource(ClearColor(Color::srgb(0.1, 0.1, 0.1)))
     .insert_resource(Time::<Fixed>::from_hz(60.))
