@@ -1,7 +1,6 @@
 use bevy::{
     asset::Asset,
-    mesh::CircleMeshBuilder,
-    mesh::{Mesh, MeshVertexBufferLayoutRef},
+    mesh::{CircleMeshBuilder, Mesh, MeshVertexBufferLayoutRef},
     pbr::{Material, MaterialPipeline, MaterialPipelineKey},
     prelude::*,
     reflect::TypePath,
