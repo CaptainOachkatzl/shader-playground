@@ -16,7 +16,7 @@ use crate::{
         ScenePlugin,
         basic_coloring::{BasicColoringMaterial, BasicColoringPlugin},
         paint_cube_face::{PaintCubeFacePlugin, PaintFaceMaterial},
-        rainbow_cube::{RainbowCubeMaterial, RainbowCubePlugin},
+        rainbow_cube::{RainbowMaterial, RainbowCubePlugin},
     },
 };
 
@@ -48,7 +48,7 @@ pub fn run() {
     .add_plugins((
         MaterialPlugin::<BasicColoringMaterial>::default(),
         MaterialPlugin::<PaintFaceMaterial>::default(),
-        MaterialPlugin::<RainbowCubeMaterial>::default(),
+        MaterialPlugin::<RainbowMaterial>::default(),
     ))
     .insert_resource(ClearColor(Color::srgb(0.1, 0.1, 0.1)))
     .insert_resource(Time::<Fixed>::from_hz(60.))

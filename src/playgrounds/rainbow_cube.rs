@@ -23,11 +23,7 @@ impl Plugin for RainbowCubePlugin {
             );
         app.add_systems(
             OnEnter(PlaygroundScene::RainbowCube),
-            (
-                setup,
-                bevy::asset::handle_internal_asset_events,
-            )
-                .chain(),
+            (setup, bevy::asset::handle_internal_asset_events).chain(),
         )
         .add_systems(
             Update,
@@ -50,7 +46,7 @@ fn setup(mut commands: Commands) {
 
             // cube
             Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-            MeshMaterial3d::<RainbowCubeMaterial>(asset_value(RainbowCubeMaterial {
+            MeshMaterial3d::<RainbowMaterial>(asset_value(RainbowMaterial {
                 animation_progress: 0.0,
             }))
             Transform::from_xyz(0.0, 0.5, 0.0),
@@ -67,21 +63,21 @@ fn setup(mut commands: Commands) {
     commands.spawn_scene(scene);
 }
 
-fn update(time: Res<Time>, mut custom_materials: ResMut<Assets<RainbowCubeMaterial>>) {
+fn update(time: Res<Time>, mut custom_materials: ResMut<Assets<RainbowMaterial>>) {
     for (_, material) in custom_materials.iter_mut() {
         material.animation_progress = time.elapsed_secs() % 1.0;
     }
 }
 
-const SHADER_PATH: &str = "shaders/rainbow_cube.wgsl";
+const SHADER_PATH: &str = "shaders/rainbow.wgsl";
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-pub struct RainbowCubeMaterial {
+pub struct RainbowMaterial {
     #[uniform(0)]
     pub animation_progress: f32,
 }
 
-impl Material for RainbowCubeMaterial {
+impl Material for RainbowMaterial {
     fn vertex_shader() -> ShaderRef {
         SHADER_PATH.into()
     }
