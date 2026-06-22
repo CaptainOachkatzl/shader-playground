@@ -16,11 +16,6 @@ pub struct RainbowCubePlugin;
 
 impl Plugin for RainbowCubePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(PlaygroundScene::RainbowCube), setup)
-            .add_systems(
-                Update,
-                update.run_if(in_state(PlaygroundScene::RainbowCube)),
-            );
         app.add_systems(
             OnEnter(PlaygroundScene::RainbowCube),
             (setup, bevy::asset::handle_internal_asset_events).chain(),
