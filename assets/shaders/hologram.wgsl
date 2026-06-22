@@ -35,21 +35,5 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     const frequency: f32 = 10.0;
     let normalized_y = in.local_y + 0.5;
     let hsv = vec3<f32>((normalized_y - material.animation_progress), 1, 1);
-    return vec4<f32>(hsv_to_rgb(hsv), 0.5);
-}
-
-fn hsv_to_rgb(hsv: vec3<f32>) -> vec3<f32> {
-    let h = hsv.x;
-    let s = hsv.y;
-    let v = hsv.z;
-
-    let k = vec4<f32>(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-
-    let p = abs(fract(vec3<f32>(h) + k.xyz) * 6.0 - vec3<f32>(k.w));
-
-    return v * mix(
-        vec3<f32>(1.0),
-        clamp(p - vec3<f32>(1.0), vec3<f32>(0.0), vec3<f32>(1.0)),
-        vec3<f32>(s)
-    );
+    return vec4<f32>(0, 1, 0.5, 0.3);
 }

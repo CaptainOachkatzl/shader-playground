@@ -92,4 +92,8 @@ impl Material for HologramMaterial {
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())
     }
+
+    fn alpha_mode(&self) -> AlphaMode {
+        AlphaMode::Blend
+    }
 }
