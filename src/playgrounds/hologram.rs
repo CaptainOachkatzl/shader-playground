@@ -1,12 +1,9 @@
 use bevy::{
     asset::Asset,
-    mesh::{CircleMeshBuilder, Mesh, MeshVertexBufferLayoutRef},
-    pbr::{Material, MaterialPipeline, MaterialPipelineKey},
+    mesh::CircleMeshBuilder,
+    pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
-    reflect::TypePath,
-    render::render_resource::{
-        AsBindGroup, RenderPipelineDescriptor, SpecializedMeshPipelineError,
-    },
+    render::render_resource::AsBindGroup,
     shader::ShaderRef,
 };
 
@@ -16,13 +13,10 @@ pub struct HologramPlugin;
 
 impl Plugin for HologramPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(PlaygroundScene::Hologram), setup)
-            .add_systems(Update, update.run_if(in_state(PlaygroundScene::Hologram)));
         app.add_systems(
             OnEnter(PlaygroundScene::Hologram),
             (setup, bevy::asset::handle_internal_asset_events).chain(),
-        )
-        .add_systems(Update, update.run_if(in_state(PlaygroundScene::Hologram)));
+        );
     }
 }
 
@@ -39,8 +33,10 @@ fn setup(mut commands: Commands) {
 
             // cube
             Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
-            MeshMaterial3d::<HologramMaterial>(asset_value(HologramMaterial {
-                animation_progress: 0.0,
+            MeshMaterial3d::<HologramMaterial>(asset_value(HologramMaterial{
+                base: StandardMaterial::default(),
+                extension: HologramExtension {  },
+
             }))
             Transform::from_xyz(0.0, 0.5, 0.0),
 
@@ -56,44 +52,23 @@ fn setup(mut commands: Commands) {
     commands.spawn_scene(scene);
 }
 
-fn update(time: Res<Time>, mut custom_materials: ResMut<Assets<HologramMaterial>>) {
-    for (_, material) in custom_materials.iter_mut() {
-        material.animation_progress = time.elapsed_secs() % 1.0;
-    }
-}
-
 const SHADER_PATH: &str = "shaders/hologram.wgsl";
 
-#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-pub struct HologramMaterial {
-    #[uniform(0)]
-    pub animation_progress: f32,
-}
+pub type HologramMaterial = ExtendedMaterial<StandardMaterial, HologramExtension>;
 
-impl Material for HologramMaterial {
+#[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
+pub struct HologramExtension {}
+
+impl MaterialExtension for HologramExtension {
     fn vertex_shader() -> ShaderRef {
         SHADER_PATH.into()
     }
+
     fn fragment_shader() -> ShaderRef {
         SHADER_PATH.into()
     }
 
-    fn specialize(
-        _pipeline: &MaterialPipeline,
-        descriptor: &mut RenderPipelineDescriptor,
-        layout: &MeshVertexBufferLayoutRef,
-        _key: MaterialPipelineKey<Self>,
-    ) -> Result<(), SpecializedMeshPipelineError> {
-        let vertex_layout = layout.0.get_layout(&[
-            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
-            Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
-            Mesh::ATTRIBUTE_UV_0.at_shader_location(2),
-        ])?;
-        descriptor.vertex.buffers = vec![vertex_layout];
-        Ok(())
-    }
-
-    fn alpha_mode(&self) -> AlphaMode {
-        AlphaMode::Blend
+    fn alpha_mode() -> Option<AlphaMode> {
+        Some(AlphaMode::Blend)
     }
 }
