@@ -60,9 +60,9 @@ pub type HologramMaterial = ExtendedMaterial<StandardMaterial, HologramExtension
 pub struct HologramExtension {}
 
 impl MaterialExtension for HologramExtension {
-    // fn vertex_shader() -> ShaderRef {
-    //     SHADER_PATH.into()
-    // }
+    fn vertex_shader() -> ShaderRef {
+        SHADER_PATH.into()
+    }
 
     fn fragment_shader() -> ShaderRef {
         SHADER_PATH.into()
