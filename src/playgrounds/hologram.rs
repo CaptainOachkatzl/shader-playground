@@ -34,7 +34,7 @@ fn setup(mut commands: Commands) {
             // cube
             Mesh3d(asset_value(Cuboid::new(1.0, 1.0, 1.0)))
             MeshMaterial3d::<HologramMaterial>(asset_value(HologramMaterial{
-                base: StandardMaterial::default(),
+                base: StandardMaterial { alpha_mode: AlphaMode::Blend, ..Default::default() },
                 extension: HologramExtension {  },
 
             }))
