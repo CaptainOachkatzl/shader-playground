@@ -19,6 +19,7 @@ use crate::{
         hologram::{HologramMaterial, HologramPlugin},
         paint_cube_face::{PaintCubeFacePlugin, PaintFaceMaterial},
         rainbow_cube::{RainbowCubePlugin, RainbowMaterial},
+        specialized_pipeline::SpecializedPipelinePlugin,
     },
 };
 
@@ -52,6 +53,7 @@ pub fn run() {
         RainbowCubePlugin,
         HologramPlugin,
         CustomRenderPhasePlugin,
+        SpecializedPipelinePlugin,
     ))
     .add_plugins((
         MaterialPlugin::<BasicColoringMaterial>::default(),
