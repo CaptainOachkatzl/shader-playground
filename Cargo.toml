@@ -7,3 +7,5 @@ edition = "2024"
 bevy = "0.19.0"
 leafwing-input-manager = "*"
 strum = { version = "*", features = ["derive"] }
+indexmap = "*"
+nonmax = "*"

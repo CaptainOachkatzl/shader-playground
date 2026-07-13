@@ -5881,7 +5881,9 @@ name = "shader-playground"
 version = "0.1.0"
 dependencies = [
  "bevy 0.19.0",
+ "indexmap",
  "leafwing-input-manager",
+ "nonmax",
  "strum",
 ]
 

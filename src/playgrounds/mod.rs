@@ -2,7 +2,7 @@ pub mod basic_coloring;
 pub mod paint_cube_face;
 pub mod rainbow_cube;
 pub mod hologram;
-pub mod custom_pipeline;
+pub mod custom_render_phase;
 
 use bevy::prelude::*;
 use strum::{EnumIter, IntoEnumIterator};
@@ -14,7 +14,7 @@ pub enum PlaygroundScene {
     PaintCubeFace,
     RainbowCube,
     Hologram,
-    CustomPipeline,
+    CustomRenderPhase,
 }
 
 impl PlaygroundScene {
@@ -24,7 +24,7 @@ impl PlaygroundScene {
             PlaygroundScene::PaintCubeFace => KeyCode::Digit2,
             PlaygroundScene::RainbowCube => KeyCode::Digit3,
             PlaygroundScene::Hologram => KeyCode::Digit4,
-            PlaygroundScene::CustomPipeline => KeyCode::Digit5,
+            PlaygroundScene::CustomRenderPhase => KeyCode::Digit5,
         }
     }
 }
