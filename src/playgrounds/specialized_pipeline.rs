@@ -1,7 +1,10 @@
+use std::f32::consts::PI;
+
 use bevy::{
     camera::visibility::{self, VisibilityClass},
     core_pipeline::core_3d::{CORE_3D_DEPTH_FORMAT, Opaque3d, Opaque3dBatchSetKey, Opaque3dBinKey},
     ecs::change_detection::Tick,
+    math::ops::{cos, sin},
     mesh::MeshVertexBufferLayoutRef,
     pbr::{
         DrawMesh, MeshPipeline, MeshPipelineKey, MeshPipelineSystems, MeshPipelineViewLayoutKey,
@@ -50,11 +53,15 @@ const SHADER_PATH: &str = "shaders/specialized_pipeline.wgsl";
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
     let mesh = ExplosionParticle::mesh();
 
-    for (x, y) in [-0.5, 0.0, 0.5, 0.0]
-        .into_iter()
-        .zip([-0.25, 0.5, -0.25, 1.5])
-    {
-        // Spawn an entity with all the required components for it to be rendered with our custom pipeline
+    const PARTICLE_COUNT: usize = 1 << 8;
+    const RADIUS: f32 = 0.5;
+
+    for i in 0..PARTICLE_COUNT {
+        let radiant = i as f32 / PARTICLE_COUNT as f32 * 2.0 * PI;
+        let x = RADIUS * sin(radiant);
+        let y = 0.0;
+        let z = RADIUS * cos(radiant);
+
         commands.spawn((
             DespawnOnExit(PlaygroundScene::SpecializedPipeline),
             // We use a marker component to identify the mesh that will be rendered
@@ -62,7 +69,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
             CustomRenderedEntity,
             // We need to add the mesh handle to the entity
             Mesh3d(meshes.add(mesh.clone())),
-            Transform::from_xyz(x, y, 0.0).with_scale(Vec3::splat(0.2)),
+            Transform::from_xyz(x, y, z).with_scale(Vec3::splat(0.01)),
         ));
     }
 }
