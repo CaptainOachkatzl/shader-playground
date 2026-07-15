@@ -50,19 +50,14 @@ impl Plugin for SpecializedPipelinePlugin {
 
 const SHADER_PATH: &str = "shaders/specialized_pipeline.wgsl";
 
+const PARTICLE_COUNT: usize = 1 << 8;
+const RADIUS: f32 = 0.01;
+
 /// Spawns the objects in the scene.
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
     let mesh = ExplosionParticle::mesh();
 
-    const PARTICLE_COUNT: usize = 1 << 8;
-    const RADIUS: f32 = 0.5;
-
     for i in 0..PARTICLE_COUNT {
-        let radiant = i as f32 / PARTICLE_COUNT as f32 * 2.0 * PI;
-        let x = RADIUS * sin(radiant);
-        let y = 0.0;
-        let z = RADIUS * cos(radiant);
-
         commands.spawn((
             DespawnOnExit(PlaygroundScene::SpecializedPipeline),
             // We use a marker component to identify the mesh that will be rendered
@@ -70,15 +65,26 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
             CustomRenderedEntity,
             // We need to add the mesh handle to the entity
             Mesh3d(meshes.add(mesh.clone())),
-            Transform::from_xyz(x, y, z).with_scale(Vec3::splat(0.01)),
+            Transform::from_translation(calculate_particle_position(i, 0.0))
+                .with_scale(Vec3::splat(0.05)),
         ));
     }
 }
 
-fn update(particles: Query<&mut Transform, With<CustomRenderedEntity>>) {
-    for mut pos in particles {
-        //pos.translation.y += 0.01;
+fn update(time: Res<Time>, mut particles: Query<&mut Transform, With<CustomRenderedEntity>>) {
+    for (i, mut pos) in particles.iter_mut().enumerate() {
+        pos.translation = calculate_particle_position(i, time.elapsed_secs() % 1.0);
     }
+}
+
+// progress is between 0.0 and 1.0
+fn calculate_particle_position(particle_index: usize, progress: f32) -> Vec3 {
+    let radiant = particle_index as f32 / PARTICLE_COUNT as f32 * 2.0 * PI;
+    let x = (RADIUS + progress) * sin(radiant);
+    let y = sin(progress * PI);
+    let z = (RADIUS + progress) * cos(radiant);
+
+    Vec3 { x, y, z }
 }
 
 // When writing custom rendering code it's generally recommended to use a plugin.
