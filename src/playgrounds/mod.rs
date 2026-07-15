@@ -4,6 +4,7 @@ pub mod rainbow_cube;
 pub mod hologram;
 pub mod custom_render_phase;
 pub mod specialized_pipeline;
+pub mod explosion_particle;
 
 use bevy::prelude::*;
 use strum::{EnumIter, IntoEnumIterator};

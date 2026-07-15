@@ -1,10 +1,8 @@
 use bevy::{
-    asset::RenderAssetUsages,
     camera::visibility::{self, VisibilityClass},
     core_pipeline::core_3d::{CORE_3D_DEPTH_FORMAT, Opaque3d, Opaque3dBatchSetKey, Opaque3dBinKey},
     ecs::change_detection::Tick,
-    math::{vec3, vec4},
-    mesh::{Indices, MeshVertexBufferLayoutRef, PrimitiveTopology},
+    mesh::MeshVertexBufferLayoutRef,
     pbr::{
         DrawMesh, MeshPipeline, MeshPipelineKey, MeshPipelineSystems, MeshPipelineViewLayoutKey,
         RenderMeshInstances, SetMeshBindGroup, SetMeshViewBindGroup, SetMeshViewEmptyBindGroup,
@@ -32,7 +30,7 @@ use bevy::{
     },
 };
 
-use crate::playgrounds::PlaygroundScene;
+use crate::playgrounds::{PlaygroundScene, explosion_particle::ExplosionParticle};
 
 pub struct SpecializedPipelinePlugin;
 
@@ -50,33 +48,12 @@ const SHADER_PATH: &str = "shaders/specialized_pipeline.wgsl";
 
 /// Spawns the objects in the scene.
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
-    // Build a custom triangle mesh with colors
-    // We define a custom mesh because the examples only uses a limited
-    // set of vertex attributes for simplicity
-    let mesh = Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::default(),
-    )
-    .with_inserted_indices(Indices::U32(vec![0, 1, 2]))
-    .with_inserted_attribute(
-        Mesh::ATTRIBUTE_POSITION,
-        vec![
-            vec3(-0.5, -0.5, 0.0),
-            vec3(0.5, -0.5, 0.0),
-            vec3(0.0, 0.25, 0.0),
-        ],
-    )
-    .with_inserted_attribute(
-        Mesh::ATTRIBUTE_COLOR,
-        vec![
-            vec4(1.0, 0.0, 0.0, 1.0),
-            vec4(0.0, 1.0, 0.0, 1.0),
-            vec4(0.0, 0.0, 1.0, 1.0),
-        ],
-    );
+    let mesh = ExplosionParticle::mesh();
 
-    // spawn 3 triangles to show that batching works
-    for (x, y) in [-0.5, 0.0, 0.5].into_iter().zip([-0.25, 0.5, -0.25]) {
+    for (x, y) in [-0.5, 0.0, 0.5, 0.0]
+        .into_iter()
+        .zip([-0.25, 0.5, -0.25, 1.5])
+    {
         // Spawn an entity with all the required components for it to be rendered with our custom pipeline
         commands.spawn((
             DespawnOnExit(PlaygroundScene::SpecializedPipeline),
@@ -85,7 +62,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
             CustomRenderedEntity,
             // We need to add the mesh handle to the entity
             Mesh3d(meshes.add(mesh.clone())),
-            Transform::from_xyz(x, y, 0.0),
+            Transform::from_xyz(x, y, 0.0).with_scale(Vec3::splat(0.2)),
         ));
     }
 }
