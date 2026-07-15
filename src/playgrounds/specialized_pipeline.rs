@@ -39,11 +39,12 @@ pub struct SpecializedPipelinePlugin;
 
 impl Plugin for SpecializedPipelinePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(CustomRenderedMeshPipelinePlugin);
-        app.add_systems(
-            OnEnter(PlaygroundScene::SpecializedPipeline),
-            (setup, bevy::asset::handle_internal_asset_events).chain(),
-        );
+        app.add_plugins(CustomRenderedMeshPipelinePlugin)
+            .add_systems(
+                OnEnter(PlaygroundScene::SpecializedPipeline),
+                (setup, bevy::asset::handle_internal_asset_events).chain(),
+            )
+            .add_systems(Update, update);
     }
 }
 
@@ -71,6 +72,12 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
             Mesh3d(meshes.add(mesh.clone())),
             Transform::from_xyz(x, y, z).with_scale(Vec3::splat(0.01)),
         ));
+    }
+}
+
+fn update(particles: Query<&mut Transform, With<CustomRenderedEntity>>) {
+    for mut pos in particles {
+        //pos.translation.y += 0.01;
     }
 }
 
