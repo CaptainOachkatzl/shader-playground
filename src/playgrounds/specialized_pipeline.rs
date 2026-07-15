@@ -23,7 +23,7 @@ use bevy::{
             ViewBinnedRenderPhases,
         },
         render_resource::{
-            ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Face, FragmentState,
+            ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, FragmentState,
             FrontFace, MultisampleState, PipelineCache, PolygonMode, PrimitiveState,
             RenderPipelineDescriptor, SpecializedMeshPipeline, SpecializedMeshPipelineError,
             SpecializedMeshPipelines, VertexState,
@@ -233,7 +233,7 @@ impl SpecializedMeshPipeline for CustomMeshPipeline {
                 topology: mesh_key.primitive_topology(),
                 strip_index_format: mesh_key.strip_index_format(),
                 front_face: FrontFace::Ccw,
-                cull_mode: Some(Face::Back),
+                cull_mode: None,
                 polygon_mode: PolygonMode::Fill,
                 ..default()
             },
