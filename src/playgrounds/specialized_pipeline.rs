@@ -1,10 +1,8 @@
-use std::f32::consts::PI;
-
 use bevy::{
     camera::visibility::{self, VisibilityClass},
     core_pipeline::core_3d::{CORE_3D_DEPTH_FORMAT, Opaque3d, Opaque3dBatchSetKey, Opaque3dBinKey},
     ecs::change_detection::Tick,
-    math::ops::{cos, sin},
+    math::ops::{cos, sin, sqrt},
     mesh::MeshVertexBufferLayoutRef,
     pbr::{
         DrawMesh, MeshPipeline, MeshPipelineKey, MeshPipelineSystems, MeshPipelineViewLayoutKey,
@@ -51,7 +49,6 @@ impl Plugin for SpecializedPipelinePlugin {
 const SHADER_PATH: &str = "shaders/specialized_pipeline.wgsl";
 
 const PARTICLE_COUNT: usize = 1 << 8;
-const RADIUS: f32 = 0.01;
 
 /// Spawns the objects in the scene.
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
@@ -73,18 +70,27 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
 
 fn update(time: Res<Time>, mut particles: Query<&mut Transform, With<CustomRenderedEntity>>) {
     for (i, mut pos) in particles.iter_mut().enumerate() {
-        pos.translation = calculate_particle_position(i, time.elapsed_secs() % 1.0);
+        pos.translation = calculate_particle_position(i, time.elapsed_secs() % 3.0);
     }
 }
 
-// progress is between 0.0 and 1.0
-fn calculate_particle_position(particle_index: usize, progress: f32) -> Vec3 {
-    let radiant = particle_index as f32 / PARTICLE_COUNT as f32 * 2.0 * PI;
-    let x = (RADIUS + progress) * sin(radiant);
-    let y = sin(progress * PI);
-    let z = (RADIUS + progress) * cos(radiant);
+// time_since_explosion is between 0.0 and 1.0
+fn calculate_particle_position(particle_index: usize, time_since_explosion: f32) -> Vec3 {
+    let d0 = initial_velocity(particle_index);
 
-    Vec3 { x, y, z }
+    d0 * time_since_explosion
+}
+
+fn initial_velocity(particle_index: usize) -> Vec3 {
+    const GOLDEN_ANGLE: f32 = 2.39996322972865332;
+
+    let y = (particle_index as f32 + 0.5) / PARTICLE_COUNT as f32; // 0..1
+
+    let phi = GOLDEN_ANGLE * particle_index as f32;
+
+    let r = sqrt(1.0 - y * y);
+
+    Vec3::new(r * sin(phi), y, r * cos(phi))
 }
 
 // When writing custom rendering code it's generally recommended to use a plugin.
