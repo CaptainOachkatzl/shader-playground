@@ -5,7 +5,8 @@
 // A 2D shader would be very similar but import from bevy_sprite instead
 #import bevy_pbr::{
     mesh_functions,
-    view_transformations::position_world_to_clip
+    view_transformations::position_world_to_clip,
+    mesh_view_bindings::view,
 }
 
 struct Vertex {
@@ -29,16 +30,19 @@ struct VertexOutput {
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
-    // This is how bevy computes the world position
-    // The vertex.instance_index is very important. Especially if you are using batching and gpu preprocessing
-    var world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
-    out.world_position = mesh_functions::mesh_position_local_to_world(world_from_local, vec4(vertex.position, 1.0));
-    out.clip_position = position_world_to_clip(out.world_position.xyz);
-
-    // We just use the raw vertex color
+    out.clip_position = billboard_position(vertex.position, vertex.instance_index);
     out.color = vertex.color.rgb;
-
     return out;
+}
+
+// billboard shader to always draw mesh from frontal view
+fn billboard_position(vertex_position: vec3<f32>, instance_index: u32) -> vec4<f32> {
+    let clip_from_world = view.clip_from_world;
+    let camera_right = normalize(vec3<f32>(clip_from_world[0].x, clip_from_world[1].x, clip_from_world[2].x));
+    let camera_up = normalize(vec3<f32>(clip_from_world[0].y, clip_from_world[1].y, clip_from_world[2].y));
+
+    let world_space = camera_right * vertex_position.x + camera_up * vertex_position.y;
+    return view.clip_from_world * mesh_functions::get_world_from_local(instance_index) * vec4<f32>(world_space, 1.);
 }
 
 @fragment
