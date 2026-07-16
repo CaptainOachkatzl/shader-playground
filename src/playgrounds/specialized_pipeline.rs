@@ -48,7 +48,7 @@ impl Plugin for SpecializedPipelinePlugin {
 
 const SHADER_PATH: &str = "shaders/specialized_pipeline.wgsl";
 
-const PARTICLE_COUNT: usize = 1 << 8;
+const PARTICLE_COUNT: usize = 1 << 10;
 
 /// Spawns the objects in the scene.
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
@@ -63,14 +63,14 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
             // We need to add the mesh handle to the entity
             Mesh3d(meshes.add(mesh.clone())),
             Transform::from_translation(calculate_particle_position(i, 0.0))
-                .with_scale(Vec3::splat(0.05)),
+                .with_scale(Vec3::splat(0.02)),
         ));
     }
 }
 
 fn update(time: Res<Time>, mut particles: Query<&mut Transform, With<CustomRenderedEntity>>) {
     for (i, mut pos) in particles.iter_mut().enumerate() {
-        pos.translation = calculate_particle_position(i, time.elapsed_secs() % 3.0);
+        pos.translation = calculate_particle_position(i, time.elapsed_secs() % 1.0 * 2.0);
     }
 }
 
