@@ -1,5 +1,6 @@
 mod custom_rendered_mesh_pipeline;
 mod explosion_particle;
+mod ui;
 
 use bevy::{
     math::ops::{cos, sin, sqrt},
@@ -11,6 +12,7 @@ use crate::playgrounds::{
     specialized_pipeline::{
         custom_rendered_mesh_pipeline::{CustomRenderedEntity, CustomRenderedMeshPipelinePlugin},
         explosion_particle::ExplosionParticle,
+        ui::UiPlugin,
     },
 };
 
@@ -18,19 +20,26 @@ pub struct SpecializedPipelinePlugin;
 
 impl Plugin for SpecializedPipelinePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(CustomRenderedMeshPipelinePlugin)
+        app.add_plugins((CustomRenderedMeshPipelinePlugin, UiPlugin))
             .insert_state(ExplosionType::RandomVelocity)
             .add_systems(
                 OnEnter(PlaygroundScene::SpecializedPipeline),
                 (setup, bevy::asset::handle_internal_asset_events).chain(),
             )
-            .add_systems(Update, update);
+            .add_systems(
+                Update,
+                update.run_if(in_state(PlaygroundScene::SpecializedPipeline)),
+            )
+            .add_systems(
+                Update,
+                on_change_explosion_type.run_if(state_changed::<ExplosionType>),
+            );
     }
 }
 
 const PARTICLE_COUNT: usize = 1 << 10;
 
-#[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(States, strum::Display, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ExplosionType {
     #[default]
     ConstantExpansion,
@@ -53,12 +62,9 @@ fn setup(
 
     for i in 0..PARTICLE_COUNT {
         let initial_pos = 0.1 * fibonacci_hemisphere_distribution(i);
-        let initial_velocity = match explosion_type.get() {
-            ExplosionType::ConstantExpansion => fibonacci_hemisphere_distribution(i),
-            ExplosionType::RandomVelocity => randomized_vec3() * 4.0,
-        };
 
         commands.spawn((
+            ExplosionParticle(i),
             DespawnOnExit(PlaygroundScene::SpecializedPipeline),
             // We use a marker component to identify the mesh that will be rendered
             // with our specialized pipeline
@@ -67,7 +73,7 @@ fn setup(
             Mesh3d(meshes.add(mesh.clone())),
             Transform::from_translation(initial_pos).with_scale(Vec3::splat(0.02)),
             InitialPosition(initial_pos),
-            InitialVelocity(initial_velocity),
+            InitialVelocity(get_initial_velocity(i, &explosion_type)),
         ));
     }
 }
@@ -80,7 +86,7 @@ fn update(
     >,
 ) {
     for (mut pos, InitialPosition(pos0), InitialVelocity(v0)) in particles.iter_mut() {
-        let time_since_explosion = time.elapsed_secs() % 1.0 * 2.0;
+        let time_since_explosion = time.elapsed_secs() % 1.0;
         pos.translation = pos0 + v0 * time_since_explosion;
     }
 }
@@ -112,5 +118,21 @@ fn randomized_vec3() -> Vec3 {
         {
             return normalized * rand::random::<f32>();
         }
+    }
+}
+
+fn get_initial_velocity(particle_index: usize, explosion_type: &ExplosionType) -> Vec3 {
+    2.0 * match explosion_type {
+        ExplosionType::ConstantExpansion => fibonacci_hemisphere_distribution(particle_index),
+        ExplosionType::RandomVelocity => randomized_vec3(),
+    }
+}
+
+fn on_change_explosion_type(
+    explosion_type: Res<State<ExplosionType>>,
+    particle_q: Query<(&ExplosionParticle, &mut InitialVelocity)>,
+) {
+    for (ExplosionParticle(index), mut initial_velocity) in particle_q {
+        *initial_velocity = InitialVelocity(get_initial_velocity(*index, &explosion_type))
     }
 }

@@ -4,7 +4,8 @@ use bevy::{
     prelude::*,
 };
 
-pub struct ExplosionParticle {}
+#[derive(Component)]
+pub struct ExplosionParticle(pub usize);
 
 impl ExplosionParticle {
     pub fn mesh() -> Mesh {
