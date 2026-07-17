@@ -7,8 +7,10 @@ use bevy::{
 };
 
 use crate::playgrounds::{
-    PlaygroundScene, specialized_pipeline::{
-        custom_rendered_mesh_pipeline::{CustomRenderedEntity, CustomRenderedMeshPipelinePlugin}, explosion_particle::ExplosionParticle,
+    PlaygroundScene,
+    specialized_pipeline::{
+        custom_rendered_mesh_pipeline::{CustomRenderedEntity, CustomRenderedMeshPipelinePlugin},
+        explosion_particle::ExplosionParticle,
     },
 };
 
@@ -24,12 +26,10 @@ impl Plugin for SpecializedPipelinePlugin {
             )
             .add_systems(
                 Update,
-                update_constant_expansion.run_if(in_state(ExplosionType::ConstantExpansion)),
+                update.run_if(in_state(ExplosionType::ConstantExpansion)),
             );
     }
 }
-
-
 
 const PARTICLE_COUNT: usize = 1 << 10;
 
@@ -39,11 +39,19 @@ pub enum ExplosionType {
     ConstantExpansion,
 }
 
+#[derive(Component)]
+struct InitialPosition(pub Vec3);
+
+#[derive(Component)]
+struct InitialVelocity(pub Vec3);
+
 /// Spawns the objects in the scene.
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
     let mesh = ExplosionParticle::mesh();
 
     for i in 0..PARTICLE_COUNT {
+        let initial_pos = fibonacci_hemisphere_distribution(i);
+
         commands.spawn((
             DespawnOnExit(PlaygroundScene::SpecializedPipeline),
             // We use a marker component to identify the mesh that will be rendered
@@ -51,29 +59,27 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
             CustomRenderedEntity,
             // We need to add the mesh handle to the entity
             Mesh3d(meshes.add(mesh.clone())),
-            Transform::from_translation(calculate_particle_position(i, 0.0))
-                .with_scale(Vec3::splat(0.02)),
+            Transform::from_translation(initial_pos).with_scale(Vec3::splat(0.02)),
+            InitialPosition(initial_pos * 0.1), // keep even distribution but down size it to start off centered
+            InitialVelocity(initial_pos),
         ));
     }
 }
 
-fn update_constant_expansion(
+fn update(
     time: Res<Time>,
-    mut particles: Query<&mut Transform, With<CustomRenderedEntity>>,
+    mut particles: Query<
+        (&mut Transform, &InitialPosition, &InitialVelocity),
+        With<CustomRenderedEntity>,
+    >,
 ) {
-    for (i, mut pos) in particles.iter_mut().enumerate() {
-        pos.translation = calculate_particle_position(i, time.elapsed_secs() % 1.0 * 2.0);
+    for (mut pos, InitialPosition(pos0), InitialVelocity(v0)) in particles.iter_mut() {
+        let time_since_explosion = time.elapsed_secs() % 1.0 * 2.0;
+        pos.translation = pos0 + v0 * time_since_explosion;
     }
 }
 
-// time_since_explosion is between 0.0 and 1.0
-fn calculate_particle_position(particle_index: usize, time_since_explosion: f32) -> Vec3 {
-    let d0 = initial_velocity(particle_index);
-
-    d0 * time_since_explosion
-}
-
-fn initial_velocity(particle_index: usize) -> Vec3 {
+fn fibonacci_hemisphere_distribution(particle_index: usize) -> Vec3 {
     const GOLDEN_ANGLE: f32 = 2.39996322972865332;
 
     let y = (particle_index as f32 + 0.5) / PARTICLE_COUNT as f32; // 0..1
