@@ -5911,7 +5911,10 @@ version = "0.1.0"
 dependencies = [
  "bevy 0.19.0",
  "copy_to_output",
+ "indexmap",
  "leafwing-input-manager",
+ "nonmax",
+ "rand 0.9.2",
  "strum",
 ]
 
