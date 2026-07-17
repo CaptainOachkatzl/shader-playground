@@ -19,15 +19,12 @@ pub struct SpecializedPipelinePlugin;
 impl Plugin for SpecializedPipelinePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(CustomRenderedMeshPipelinePlugin)
-            .insert_state(ExplosionType::default())
+            .insert_state(ExplosionType::RandomVelocity)
             .add_systems(
                 OnEnter(PlaygroundScene::SpecializedPipeline),
                 (setup, bevy::asset::handle_internal_asset_events).chain(),
             )
-            .add_systems(
-                Update,
-                update.run_if(in_state(ExplosionType::ConstantExpansion)),
-            );
+            .add_systems(Update, update);
     }
 }
 
@@ -37,6 +34,7 @@ const PARTICLE_COUNT: usize = 1 << 10;
 pub enum ExplosionType {
     #[default]
     ConstantExpansion,
+    RandomVelocity,
 }
 
 #[derive(Component)]
@@ -46,11 +44,19 @@ struct InitialPosition(pub Vec3);
 struct InitialVelocity(pub Vec3);
 
 /// Spawns the objects in the scene.
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    explosion_type: Res<State<ExplosionType>>,
+) {
     let mesh = ExplosionParticle::mesh();
 
     for i in 0..PARTICLE_COUNT {
-        let initial_pos = fibonacci_hemisphere_distribution(i);
+        let initial_pos = 0.1 * fibonacci_hemisphere_distribution(i);
+        let initial_velocity = match explosion_type.get() {
+            ExplosionType::ConstantExpansion => fibonacci_hemisphere_distribution(i),
+            ExplosionType::RandomVelocity => randomized_vec3() * 4.0,
+        };
 
         commands.spawn((
             DespawnOnExit(PlaygroundScene::SpecializedPipeline),
@@ -60,8 +66,8 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
             // We need to add the mesh handle to the entity
             Mesh3d(meshes.add(mesh.clone())),
             Transform::from_translation(initial_pos).with_scale(Vec3::splat(0.02)),
-            InitialPosition(initial_pos * 0.1), // keep even distribution but down size it to start off centered
-            InitialVelocity(initial_pos),
+            InitialPosition(initial_pos),
+            InitialVelocity(initial_velocity),
         ));
     }
 }
@@ -89,4 +95,22 @@ fn fibonacci_hemisphere_distribution(particle_index: usize) -> Vec3 {
     let r = sqrt(1.0 - y * y);
 
     Vec3::new(r * sin(phi), y, r * cos(phi))
+}
+
+fn randomized_vec3() -> Vec3 {
+    fn random_f32_neg_1_to_pos_1() -> f32 {
+        rand::random::<f32>() * 2.0 - 1.0
+    }
+
+    loop {
+        if let Some(normalized) = Vec3::new(
+            random_f32_neg_1_to_pos_1(),
+            rand::random::<f32>(), // y >= 0 to only move to northern hemisphere
+            random_f32_neg_1_to_pos_1(),
+        )
+        .try_normalize()
+        {
+            return normalized * rand::random::<f32>();
+        }
+    }
 }

@@ -9,6 +9,7 @@ leafwing-input-manager = "*"
 strum = { version = "*", features = ["derive"] }
 indexmap = "*"
 nonmax = "*"
+rand = "*"
 
 [build-dependencies]
 copy_to_output = "*"
