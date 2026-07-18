@@ -40,9 +40,7 @@ pub fn run() {
                 }),
                 ..Default::default()
             })
-            .set(ImagePlugin {
-                default_sampler: ImageSamplerDescriptor::nearest(),
-            }),
+            .set(ImagePlugin::default_nearest()),
     )
     // .add_plugins((LogDiagnosticsPlugin::default(), FrameTimeDiagnosticsPlugin::default()))
     // thirdparty plugins
