@@ -30,10 +30,12 @@ pub struct ComputeShaderPlugin;
 impl Plugin for ComputeShaderPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(GameOfLifeComputePlugin)
+            .add_systems(Startup, init_resources)
             .add_systems(
                 OnEnter(PlaygroundScene::ComputeShader),
                 (setup, bevy::asset::handle_internal_asset_events).chain(),
             )
+            .add_systems(OnExit(PlaygroundScene::ComputeShader), setup_3d_camera)
             .add_systems(
                 Update,
                 switch_textures.run_if(in_state(PlaygroundScene::ComputeShader)),
@@ -41,23 +43,13 @@ impl Plugin for ComputeShaderPlugin {
     }
 }
 
-fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+fn init_resources(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     let mut image = Image::new_target_texture(SIZE.x, SIZE.y, TextureFormat::Rgba32Float, None);
     image.asset_usage = RenderAssetUsages::RENDER_WORLD;
     image.texture_descriptor.usage =
         TextureUsages::COPY_DST | TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING;
     let image0 = images.add(image.clone());
     let image1 = images.add(image);
-
-    commands.spawn((
-        DespawnOnExit(PlaygroundScene::ComputeShader),
-        Sprite {
-            image: image0.clone(),
-            custom_size: Some(SIZE.as_vec2()),
-            ..default()
-        },
-        Transform::from_scale(Vec3::splat(DISPLAY_FACTOR as f32)),
-    ));
 
     commands.insert_resource(GameOfLifeImages {
         texture_a: image0,
@@ -67,6 +59,39 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     commands.insert_resource(GameOfLifeUniforms {
         alive_color: LinearRgba::RED,
     });
+}
+
+fn setup(
+    mut commands: Commands,
+    images: Res<GameOfLifeImages>,
+    camera_q: Query<Entity, With<Camera3d>>,
+) {
+    if let Ok(cam_entity) = camera_q.single() {
+        commands.entity(cam_entity).despawn();
+    }
+
+    commands.spawn((
+        Camera2d::default(),
+        DespawnOnExit(PlaygroundScene::ComputeShader),
+    ));
+
+    commands.spawn((
+        DespawnOnExit(PlaygroundScene::ComputeShader),
+        Sprite {
+            image: images.texture_a.clone(),
+            custom_size: Some(SIZE.as_vec2()),
+            ..default()
+        },
+        Transform::from_scale(Vec3::splat(DISPLAY_FACTOR as f32)),
+    ));
+}
+
+fn setup_3d_camera(mut commands: Commands) {
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(-6.0, 4.5, 0.).looking_at(Vec3::ZERO, Vec3::Y),
+        Msaa::Off,
+    ));
 }
 
 // Switch texture to display every frame to show the one that was written to most recently.
@@ -94,22 +119,10 @@ impl Plugin for GameOfLifeComputePlugin {
             .add_systems(RenderStartup, init_game_of_life_pipeline)
             .add_systems(
                 Render,
-                prepare_bind_group
-                    .in_set(RenderSystems::PrepareBindGroups)
-                    .run_if(in_state(PlaygroundScene::ComputeShader)),
+                prepare_bind_group.in_set(RenderSystems::PrepareBindGroups),
             )
-            .add_systems(
-                Render,
-                update
-                    .in_set(RenderSystems::Prepare)
-                    .run_if(in_state(PlaygroundScene::ComputeShader)),
-            )
-            .add_systems(
-                RenderGraph,
-                game_of_life
-                    .before(camera_driver)
-                    .run_if(in_state(PlaygroundScene::ComputeShader)),
-            );
+            .add_systems(Render, update.in_set(RenderSystems::Prepare))
+            .add_systems(RenderGraph, game_of_life.before(camera_driver));
     }
 }
 

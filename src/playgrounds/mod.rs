@@ -1,10 +1,10 @@
 pub mod basic_coloring;
+pub mod compute_shader;
 pub mod custom_render_phase;
 pub mod hologram;
 pub mod paint_cube_face;
 pub mod rainbow_cube;
 pub mod specialized_pipeline;
-pub mod compute_shader;
 
 use bevy::prelude::*;
 use strum::{EnumIter, IntoEnumIterator};
