@@ -1,10 +1,11 @@
 use bevy::{
     asset::RenderAssetUsages,
     core_pipeline::schedule::camera_driver,
+    ecs::component::Mutable,
     prelude::*,
     render::{
-        Render, RenderApp, RenderStartup, RenderSystems,
-        extract_resource::{ExtractResource, ExtractResourcePlugin},
+        Extract, Render, RenderApp, RenderStartup, RenderSystems,
+        extract_resource::ExtractResource,
         render_asset::RenderAssets,
         render_resource::{
             binding_types::{texture_storage_2d, uniform_buffer},
@@ -107,22 +108,57 @@ struct GameOfLifeComputePlugin;
 
 impl Plugin for GameOfLifeComputePlugin {
     fn build(&self, app: &mut App) {
-        // Extract the game of life image resource from the main world into the render world
-        // for operation on by the compute shader and display on the sprite.
-        app.add_plugins((
-            ExtractResourcePlugin::<GameOfLifeImages>::default(),
-            ExtractResourcePlugin::<GameOfLifeUniforms>::default(),
-        ));
         let render_app = app.sub_app_mut(RenderApp);
         render_app
             .init_resource::<GameOfLifeState>()
+            .add_systems(
+                ExtractSchedule,
+                (
+                    extract_state::<PlaygroundScene>,
+                    extract_conditionally::<GameOfLifeImages>,
+                    extract_conditionally::<GameOfLifeUniforms>,
+                ),
+            )
             .add_systems(RenderStartup, init_game_of_life_pipeline)
             .add_systems(
                 Render,
-                prepare_bind_group.in_set(RenderSystems::PrepareBindGroups),
+                (
+                    prepare_bind_group.in_set(RenderSystems::PrepareBindGroups),
+                    update.in_set(RenderSystems::Prepare),
+                )
+                    .run_if(in_state(PlaygroundScene::ComputeShader)),
             )
-            .add_systems(Render, update.in_set(RenderSystems::Prepare))
-            .add_systems(RenderGraph, game_of_life.before(camera_driver));
+            .add_systems(
+                RenderGraph,
+                game_of_life
+                    .before(camera_driver)
+                    .run_if(in_state(PlaygroundScene::ComputeShader)),
+            );
+    }
+}
+
+fn extract_state<S: States>(mut commands: Commands, state: Extract<Res<State<S>>>) {
+    commands.insert_resource(State::new(state.get().clone()));
+}
+
+fn extract_conditionally<R: ExtractResource<(), Mutability = Mutable>>(
+    mut commands: Commands,
+    condition: Extract<Res<State<PlaygroundScene>>>,
+    main_resource: Extract<Option<Res<R::Source>>>,
+    target_resource: Option<ResMut<R>>,
+) {
+    if *condition.get() != PlaygroundScene::ComputeShader {
+        return;
+    }
+
+    if let Some(main_resource) = main_resource.as_ref() {
+        if let Some(mut target_resource) = target_resource {
+            if main_resource.is_changed() {
+                *target_resource = R::extract_resource(main_resource);
+            }
+        } else {
+            commands.insert_resource(R::extract_resource(main_resource));
+        }
     }
 }
 
