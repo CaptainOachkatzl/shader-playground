@@ -30,21 +30,36 @@ pub struct ComputeShaderPlugin;
 
 impl Plugin for ComputeShaderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(GameOfLifeComputePlugin)
-            .add_systems(Startup, init_resources)
-            .add_systems(
-                OnEnter(PlaygroundScene::ComputeShader),
-                (setup, bevy::asset::handle_internal_asset_events).chain(),
+        app.insert_resource(GameOfLifeUniforms {
+            alive_color: LinearRgba::RED,
+        })
+        .add_plugins(GameOfLifeComputePlugin)
+        .add_systems(
+            OnEnter(PlaygroundScene::ComputeShader),
+            (
+                init_images,
+                setup,
+                bevy::asset::handle_internal_asset_events,
             )
-            .add_systems(OnExit(PlaygroundScene::ComputeShader), setup_3d_camera)
-            .add_systems(
-                Update,
-                switch_textures.run_if(in_state(PlaygroundScene::ComputeShader)),
-            );
+                .chain(),
+        )
+        .add_systems(OnExit(PlaygroundScene::ComputeShader), setup_3d_camera)
+        .add_systems(
+            Update,
+            switch_textures.run_if(in_state(PlaygroundScene::ComputeShader)),
+        );
     }
 }
 
-fn init_resources(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+fn init_images(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    existing_images: Option<Res<GameOfLifeImages>>,
+) {
+    if existing_images.is_some() {
+        return;
+    }
+
     let mut image = Image::new_target_texture(SIZE.x, SIZE.y, TextureFormat::Rgba32Float, None);
     image.asset_usage = RenderAssetUsages::RENDER_WORLD;
     image.texture_descriptor.usage =
@@ -55,10 +70,6 @@ fn init_resources(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     commands.insert_resource(GameOfLifeImages {
         texture_a: image0,
         texture_b: image1,
-    });
-
-    commands.insert_resource(GameOfLifeUniforms {
-        alive_color: LinearRgba::RED,
     });
 }
 
