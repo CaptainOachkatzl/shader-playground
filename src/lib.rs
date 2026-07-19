@@ -1,4 +1,4 @@
-pub mod camera;
+mod camera;
 mod playgrounds;
 mod settings;
 
