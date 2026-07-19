@@ -3,31 +3,41 @@ use bevy::{
     prelude::*,
 };
 
-pub trait StateScheduled<S: States> {
-    fn active_state() -> S;
+struct StateSchedule<'a, S: States> {
+    state: S,
+    app: &'a mut App,
+}
 
-    // fn add_system_running_on_enter<M>(
-    //     app: &mut App,
-    //     system: impl IntoScheduleConfigs<ScheduleSystem, M>,
-    // ) {
-    //     app.add_systems(OnEnter(Self::active_state()), system);
-    // }
+impl<'a, S: States> StateSchedule<'a, S> {
+    fn new(app: &'a mut App, state: S) -> Self {
+        Self { state, app }
+    }
 
-    // fn add_system_running_on_exit<M>(
-    //     app: &mut App,
-    //     system: impl IntoScheduleConfigs<ScheduleSystem, M>,
-    // ) {
-    //     app.add_systems(OnExit(Self::active_state()), system);
-    // }
+    fn add_on_enter_systems<M>(
+        &mut self,
+        system: impl IntoScheduleConfigs<ScheduleSystem, M>,
+    ) -> &mut Self {
+        self.app.add_systems(OnEnter(self.state.clone()), system);
+        self
+    }
 
-    // /// add a system that will only run if the application is in the [active state](Self::active_state)
-    // fn add_systems_running_in_state<M>(
-    //     app: &mut App,
-    //     schedule: impl ScheduleLabel,
-    //     system: impl IntoScheduleConfigs<ScheduleSystem, M>,
-    // ) {
-    //     app.add_systems(schedule, system.run_if(in_state(Self::active_state())));
-    // }
+    fn add_on_exit_systems<M>(
+        &mut self,
+        system: impl IntoScheduleConfigs<ScheduleSystem, M>,
+    ) -> &mut Self {
+        self.app.add_systems(OnExit(self.state.clone()), system);
+        self
+    }
+
+    fn add_state_scoped_systems<M>(
+        &mut self,
+        schedule: impl ScheduleLabel,
+        system: impl IntoScheduleConfigs<ScheduleSystem, M>,
+    ) -> &mut Self {
+        self.app
+            .add_systems(schedule, system.run_if(in_state(self.state.clone())));
+        self
+    }
 }
 
 pub trait AppStateScheduledExt {
@@ -91,18 +101,22 @@ enum TestState {
 struct TestPlugin;
 impl Plugin for TestPlugin {
     fn build(&self, app: &mut App) {
+        let mut state_schedule = StateSchedule::new(app, TestState::A);
+
+        state_schedule
+            .add_on_enter_systems(test_system)
+            .add_on_exit_systems(test_system)
+            .add_state_scoped_systems(Update, test_system);
+
+        app.add_systems(OnEnter(TestState::A), test_system)
+            .add_systems(OnExit(TestState::A), test_system)
+            .add_systems(Update, test_system_with_params.run_if(in_state(TestState::A)));
 
         TestState::A.add_system_running_on_enter(app, test_system);
 
         app.add_systems(OnEnter(TestState::A), test_system);
 
         app.add_system_running_on_enter(TestState::A, test_system);
-    }
-}
-
-impl StateScheduled<TestState> for TestPlugin {
-    fn active_state() -> TestState {
-        TestState::A
     }
 }
 
