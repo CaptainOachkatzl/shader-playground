@@ -2,6 +2,7 @@ use bevy::{
     asset::RenderAssetUsages,
     core_pipeline::schedule::camera_driver,
     ecs::component::Mutable,
+    mesh::MeshVertexBufferLayouts,
     prelude::*,
     render::{
         Extract, Render, RenderApp, RenderStartup, RenderSystems,
@@ -47,9 +48,15 @@ fn init_mesh(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut reset: MessageWriter<RenderStateReset>,
+    // mut layouts: ResMut<MeshVertexBufferLayouts>,
 ) {
     let mut mesh = Plane3d::default().mesh().size(5.0, 5.0).build();
-    mesh.asset_usage = RenderAssetUsages::RENDER_WORLD;
+    println!("get_vertex_buffer_size: {}", mesh.get_vertex_buffer_size());
+    // println!(
+    //     "get_mesh_vertex_buffer_layout: {:?}",
+    //     mesh.get_mesh_vertex_buffer_layout(&mut layouts)
+    // );
+    mesh.asset_usage = RenderAssetUsages::default();
     let mesh_handle = meshes.add(mesh);
 
     commands.insert_resource(MeshData { mesh_handle });
@@ -160,6 +167,12 @@ struct MeshManipulationUniforms {
 #[derive(Resource)]
 struct MeshManipulationBindGroups(BindGroup);
 
+#[derive(Resource, Clone)]
+struct DebugBuffer {
+    buffer: Buffer,
+    readback: Buffer,
+}
+
 fn prepare_bind_group(
     mut commands: Commands,
     pipeline: Res<MeshManipulationPipeline>,
@@ -177,6 +190,20 @@ fn prepare_bind_group(
     let mut uniform_buffer = UniformBuffer::from(uniforms.into_inner());
     uniform_buffer.write_buffer(&render_device, &queue);
 
+    let debug_buffer = render_device.create_buffer(&BufferDescriptor {
+        label: Some("debug buffer"),
+        size: 4,
+        usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
+        mapped_at_creation: false,
+    });
+
+    let debug_readback = render_device.create_buffer(&BufferDescriptor {
+        label: Some("debug readback"),
+        size: 4,
+        usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+
     let bind_group = render_device.create_bind_group(
         Some("mesh manipulation bind group"),
         &pipeline_cache.get_bind_group_layout(&pipeline.mesh_bind_group_layout),
@@ -184,12 +211,21 @@ fn prepare_bind_group(
             BindingResource::Buffer(BufferBinding {
                 buffer: vertex_slice.buffer,
                 offset: vertex_slice.range.start as u64,
-                size: NonZero::new((vertex_slice.range.count() * size_of::<Vertex>()) as u64),
+                size: NonZero::new((vertex_slice.range.count() * 48) as u64),
+            }),
+            BindingResource::Buffer(BufferBinding {
+                buffer: &debug_buffer,
+                offset: 0,
+                size: NonZero::new(4),
             }),
             &uniform_buffer,
         )),
     );
     commands.insert_resource(MeshManipulationBindGroups(bind_group));
+    commands.insert_resource(DebugBuffer {
+        buffer: debug_buffer,
+        readback: debug_readback,
+    });
 }
 
 #[derive(Resource)]
@@ -217,6 +253,7 @@ fn init_pipeline(
             ShaderStages::COMPUTE,
             (
                 storage_buffer::<Vec<Vertex>>(false),
+                storage_buffer::<Vec<u32>>(false),
                 uniform_buffer::<MeshManipulationUniforms>(false),
             ),
         ),
@@ -287,6 +324,7 @@ fn mesh_manipulation(
     pipeline_cache: Res<PipelineCache>,
     pipeline: Res<MeshManipulationPipeline>,
     state: Res<RenderState>,
+    debug_buffer: Res<DebugBuffer>,
 ) {
     let mut pass = render_context
         .command_encoder()
@@ -312,4 +350,27 @@ fn mesh_manipulation(
             pass.dispatch_workgroups(WORKGROUP_SIZE, 1, 1);
         }
     }
+
+    drop(pass);
+
+    let encoder = render_context.command_encoder();
+
+    encoder.copy_buffer_to_buffer(&debug_buffer.buffer, 0, &debug_buffer.readback, 0, 4);
+
+    let debug_buffer = debug_buffer.clone();
+    let readback = debug_buffer.readback.clone();
+    let slice = readback.slice(..);
+
+    slice.map_async(MapMode::Read, move |result| {
+        let slice = debug_buffer.readback.slice(..);
+        if result.is_ok() {
+            let data = slice.get_mapped_range();
+
+            let value = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+
+            println!("debug value = {}", value);
+        }
+    });
+
+    readback.unmap();
 }
