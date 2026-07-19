@@ -60,11 +60,16 @@ fn init_mesh(
     reset.write(RenderStateReset);
 }
 
-fn setup(mut commands: Commands, mesh_data: Res<MeshData>) {
+fn setup(
+    mut commands: Commands,
+    mesh_data: Res<MeshData>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     commands.spawn((
         DespawnOnExit(PlaygroundScene::MeshManipulation),
         Mesh3d(mesh_data.mesh_handle.clone()),
-        Transform::from_scale(Vec3::splat(DISPLAY_FACTOR as f32)),
+        MeshMaterial3d(materials.add(StandardMaterial::default())),
+        Transform::default(),
     ));
 }
 
