@@ -1,6 +1,7 @@
 pub mod camera;
 mod playgrounds;
 mod settings;
+mod state_scheduled_plugin;
 
 #[allow(unused)]
 use bevy::{
