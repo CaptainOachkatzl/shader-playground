@@ -20,6 +20,7 @@ use crate::{
         compute_shader::ComputeShaderPlugin,
         custom_render_phase::CustomRenderPhasePlugin,
         hologram::{HologramMaterial, HologramPlugin},
+        mesh_manipulation::MeshManipulationPlugin,
         paint_cube_face::{PaintCubeFacePlugin, PaintFaceMaterial},
         rainbow_cube::{RainbowCubePlugin, RainbowMaterial},
         specialized_pipeline::SpecializedPipelinePlugin,
@@ -56,6 +57,7 @@ pub fn run() {
         CustomRenderPhasePlugin,
         SpecializedPipelinePlugin,
         ComputeShaderPlugin,
+        MeshManipulationPlugin,
     ))
     .add_plugins((
         MaterialPlugin::<BasicColoringMaterial>::default(),
