@@ -1,35 +1,27 @@
 use bevy::{
-    ecs::{
-        schedule::{ScheduleConfigs, ScheduleLabel},
-        system::ScheduleSystem,
-    },
+    ecs::{schedule::ScheduleLabel, system::ScheduleSystem},
     prelude::*,
 };
 
-pub trait StateScheduledPlugin<S: States>: Plugin {
+pub trait StateScheduledPlugin<S: States> {
     fn active_state() -> S;
 
-    fn on_enter(&self) -> Vec<ScheduleConfigs<ScheduleSystem>> {
-        Vec::new()
-    }
-    fn on_exit(&self) -> Vec<ScheduleConfigs<ScheduleSystem>> {
-        Vec::new()
+    fn add_system_running_on_enter<M>(
+        app: &mut App,
+        system: impl IntoScheduleConfigs<ScheduleSystem, M>,
+    ) {
+        app.add_systems(OnEnter(Self::active_state()), system);
     }
 
-    /// needs to be called during [`Plugin::build`]
-    fn init(&self, app: &mut App) {
-        for on_enter in self.on_enter() {
-            app.add_systems(OnEnter(Self::active_state()), on_enter);
-        }
-
-        for on_exit in self.on_exit() {
-            app.add_systems(OnExit(Self::active_state()), on_exit);
-        }
+    fn add_system_running_on_exit<M>(
+        app: &mut App,
+        system: impl IntoScheduleConfigs<ScheduleSystem, M>,
+    ) {
+        app.add_systems(OnExit(Self::active_state()), system);
     }
 
     /// add a system that will only run if the application is in the [active state](Self::active_state)
     fn add_systems_running_in_state<M>(
-        &self,
         app: &mut App,
         schedule: impl ScheduleLabel,
         system: impl IntoScheduleConfigs<ScheduleSystem, M>,
@@ -40,31 +32,23 @@ pub trait StateScheduledPlugin<S: States>: Plugin {
 
 #[derive(States, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 enum TestStates {
-    state0,
-    state1,
+    State0,
+    State1,
 }
 
 struct TestPlugin;
-
 impl Plugin for TestPlugin {
     fn build(&self, app: &mut App) {
-        self.init(app);
-        self.add_systems_running_in_state(app, Update, test_system);
+        Self::add_system_running_on_enter(app, test_system_with_params);
+        Self::add_systems_running_in_state(app, Update, test_system);
     }
 }
 
 impl StateScheduledPlugin<TestStates> for TestPlugin {
     fn active_state() -> TestStates {
-        TestStates::state0
-    }
-
-    fn on_enter(&self) -> Vec<ScheduleConfigs<ScheduleSystem>> {
-        let mut systems = Vec::new();
-        systems.push(test_system.into_configs());
-        systems.push(test_system_with_params.into_configs());
-        systems
+        TestStates::State0
     }
 }
 
 fn test_system() {}
-fn test_system_with_params(commands: Commands) {}
+fn test_system_with_params(_: Commands) {}
