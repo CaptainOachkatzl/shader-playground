@@ -35,8 +35,7 @@ impl Plugin for MeshManipulationPlugin {
             pane_y_count: 64,
         })
         .add_message::<RenderStateReset>()
-        //.add_plugins(MeshManipulationComputePlugin)
-        ;
+        .add_plugins(MeshManipulationComputePlugin);
 
         add_state_scoped_systems!(
             app,
@@ -201,6 +200,13 @@ struct MeshManipulationPipeline {
     update_pipeline: CachedComputePipelineId,
 }
 
+#[derive(ShaderType)]
+struct Vertex {
+    position: Vec3,
+    normal: Vec3,
+    uv: Vec2,
+}
+
 fn init_pipeline(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -211,7 +217,7 @@ fn init_pipeline(
         &BindGroupLayoutEntries::sequential(
             ShaderStages::COMPUTE,
             (
-                storage_buffer::<Vec<Vec3>>(false),
+                storage_buffer::<Vec<Vertex>>(false),
                 uniform_buffer::<MeshManipulationUniforms>(false),
             ),
         ),
