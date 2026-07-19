@@ -8,14 +8,18 @@ use bevy::{
     shader::ShaderRef,
 };
 
-use crate::playgrounds::PlaygroundScene;
+use crate::{playgrounds::PlaygroundScene, add_state_scoped_systems};
 
 pub struct BasicColoringPlugin;
 
 impl Plugin for BasicColoringPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(PlaygroundScene::BasicColoring), setup)
-            .add_systems(OnExit(PlaygroundScene::BasicColoring), cleanup);
+        add_state_scoped_systems!(
+            app,
+            PlaygroundScene::BasicColoring,
+            OnEnter(setup),
+            OnExit(cleanup),
+        );
     }
 }
 

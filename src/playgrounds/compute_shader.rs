@@ -18,7 +18,7 @@ use bevy::{
 };
 use std::borrow::Cow;
 
-use crate::playgrounds::PlaygroundScene;
+use crate::{playgrounds::PlaygroundScene, add_state_scoped_systems};
 
 const SHADER_ASSET_PATH: &str = "shaders/game_of_life.wgsl";
 
@@ -34,20 +34,21 @@ impl Plugin for ComputeShaderPlugin {
             alive_color: LinearRgba::RED,
         })
         .add_message::<RenderStateReset>()
-        .add_plugins(GameOfLifeComputePlugin)
-        .add_systems(
-            OnEnter(PlaygroundScene::ComputeShader),
-            (
-                init_images,
-                setup,
-                bevy::asset::handle_internal_asset_events,
-            )
-                .chain(),
-        )
-        .add_systems(OnExit(PlaygroundScene::ComputeShader), setup_3d_camera)
-        .add_systems(
-            Update,
-            switch_textures.run_if(in_state(PlaygroundScene::ComputeShader)),
+        .add_plugins(GameOfLifeComputePlugin);
+
+        add_state_scoped_systems!(
+            app,
+            PlaygroundScene::ComputeShader,
+            OnEnter(
+                (
+                    init_images,
+                    setup,
+                    bevy::asset::handle_internal_asset_events,
+                )
+                    .chain()
+            ),
+            OnExit(setup_3d_camera),
+            RunInState(Update, switch_textures),
         );
     }
 }
