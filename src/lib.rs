@@ -1,7 +1,6 @@
 mod camera;
 mod playgrounds;
 mod settings;
-mod state_scoped_systems;
 
 #[allow(unused)]
 use bevy::{

@@ -7,8 +7,9 @@ use bevy::{
     },
     shader::ShaderRef,
 };
+use xs_bevy_state_scoped_systems::add_state_scoped_systems;
 
-use crate::{playgrounds::PlaygroundScene, add_state_scoped_systems};
+use crate::{playgrounds::PlaygroundScene};
 
 pub struct BasicColoringPlugin;
 

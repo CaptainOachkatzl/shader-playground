@@ -16,9 +16,10 @@ use bevy::{
     },
     shader::ShaderCacheError,
 };
+use xs_bevy_state_scoped_systems::add_state_scoped_systems;
 use std::borrow::Cow;
 
-use crate::{playgrounds::PlaygroundScene, add_state_scoped_systems};
+use crate::{playgrounds::PlaygroundScene};
 
 const SHADER_ASSET_PATH: &str = "shaders/game_of_life.wgsl";
 
