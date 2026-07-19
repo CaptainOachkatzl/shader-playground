@@ -83,10 +83,7 @@ fn setup(
         commands.entity(cam_entity).despawn();
     }
 
-    commands.spawn((
-        Camera2d::default(),
-        DespawnOnExit(PlaygroundScene::ComputeShader),
-    ));
+    commands.spawn((Camera2d, DespawnOnExit(PlaygroundScene::ComputeShader)));
 
     commands.spawn((
         DespawnOnExit(PlaygroundScene::ComputeShader),

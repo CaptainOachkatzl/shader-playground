@@ -92,7 +92,7 @@ fn update(
 }
 
 fn fibonacci_hemisphere_distribution(particle_index: usize) -> Vec3 {
-    const GOLDEN_ANGLE: f32 = 2.39996322972865332;
+    const GOLDEN_ANGLE: f32 = 2.399_963_1;
 
     let y = (particle_index as f32 + 0.5) / PARTICLE_COUNT as f32; // 0..1
 

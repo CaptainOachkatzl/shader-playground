@@ -9,7 +9,7 @@ use bevy::{
 };
 use xs_bevy_state_scoped_systems::add_state_scoped_systems;
 
-use crate::{playgrounds::PlaygroundScene};
+use crate::playgrounds::PlaygroundScene;
 
 pub struct BasicColoringPlugin;
 
@@ -51,15 +51,8 @@ fn setup(
             .map(|index| {
                 // use HSV color space to circle between red, green and blue.
                 // advancing by 120 degrees shifts to the next base color, starting with red at 0 degrees.
-                let color = Into::<LinearRgba>::into(Hsva::new(
-                    index as f32 * 120.0 % 360.0,
-                    1.0,
-                    1.0,
-                    1.0,
-                ))
-                .to_f32_array();
-
-                color
+                Into::<LinearRgba>::into(Hsva::new(index as f32 * 120.0 % 360.0, 1.0, 1.0, 1.0))
+                    .to_f32_array()
             })
             .collect();
 
