@@ -33,6 +33,7 @@ impl Plugin for ComputeShaderPlugin {
         app.insert_resource(GameOfLifeUniforms {
             alive_color: LinearRgba::RED,
         })
+        .add_message::<RenderStateReset>()
         .add_plugins(GameOfLifeComputePlugin)
         .add_systems(
             OnEnter(PlaygroundScene::ComputeShader),
@@ -54,12 +55,8 @@ impl Plugin for ComputeShaderPlugin {
 fn init_images(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
-    existing_images: Option<Res<GameOfLifeImages>>,
+    mut reset: MessageWriter<RenderStateReset>,
 ) {
-    if existing_images.is_some() {
-        return;
-    }
-
     let mut image = Image::new_target_texture(SIZE.x, SIZE.y, TextureFormat::Rgba32Float, None);
     image.asset_usage = RenderAssetUsages::RENDER_WORLD;
     image.texture_descriptor.usage =
@@ -71,6 +68,8 @@ fn init_images(
         texture_a: image0,
         texture_b: image1,
     });
+
+    reset.write(RenderStateReset);
 }
 
 fn setup(
@@ -126,6 +125,7 @@ impl Plugin for GameOfLifeComputePlugin {
                 ExtractSchedule,
                 (
                     extract_state::<PlaygroundScene>,
+                    reset_render_state,
                     extract_conditionally::<GameOfLifeImages>,
                     extract_conditionally::<GameOfLifeUniforms>,
                 ),
@@ -145,6 +145,15 @@ impl Plugin for GameOfLifeComputePlugin {
                     .before(camera_driver)
                     .run_if(in_state(PlaygroundScene::ComputeShader)),
             );
+    }
+}
+
+fn reset_render_state(
+    mut reset: Extract<MessageReader<RenderStateReset>>,
+    mut render_state: ResMut<GameOfLifeState>,
+) {
+    if reset.read().count() > 0 {
+        *render_state = GameOfLifeState::Loading;
     }
 }
 
@@ -172,6 +181,9 @@ fn extract_conditionally<R: ExtractResource<(), Mutability = Mutable>>(
         }
     }
 }
+
+#[derive(Message)]
+struct RenderStateReset;
 
 #[derive(Resource, Clone, ExtractResource)]
 struct GameOfLifeImages {
