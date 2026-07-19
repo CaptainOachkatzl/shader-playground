@@ -22,9 +22,7 @@ use crate::playgrounds::PlaygroundScene;
 
 const SHADER_ASSET_PATH: &str = "shaders/mesh_manipulation.wgsl";
 
-const DISPLAY_FACTOR: u32 = 4;
-const SIZE: UVec2 = UVec2::new(1280 / DISPLAY_FACTOR, 720 / DISPLAY_FACTOR);
-const WORKGROUP_SIZE: u32 = 8;
+const WORKGROUP_SIZE: u32 = 1;
 
 pub struct MeshManipulationPlugin;
 
@@ -76,13 +74,14 @@ struct MeshManipulationComputePlugin;
 
 impl Plugin for MeshManipulationComputePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(MeshAllocatorSettings {
-            extra_buffer_usages: BufferUsages::STORAGE,
-            ..default()
-        });
         let render_app = app.sub_app_mut(RenderApp);
         render_app
             .init_resource::<RenderState>()
+            // ATTN: MeshAllocatorSettings MUST BE INSERTED IN RENDER WORLD
+            .insert_resource(MeshAllocatorSettings {
+                extra_buffer_usages: BufferUsages::STORAGE,
+                ..Default::default()
+            })
             .add_systems(
                 ExtractSchedule,
                 (
@@ -179,13 +178,13 @@ fn prepare_bind_group(
     uniform_buffer.write_buffer(&render_device, &queue);
 
     let bind_group = render_device.create_bind_group(
-        None,
+        Some("mesh manipulation bind group"),
         &pipeline_cache.get_bind_group_layout(&pipeline.mesh_bind_group_layout),
         &BindGroupEntries::sequential((
             BindingResource::Buffer(BufferBinding {
                 buffer: vertex_slice.buffer,
                 offset: vertex_slice.range.start as u64,
-                size: NonZero::new(vertex_slice.range.count() as u64),
+                size: NonZero::new((vertex_slice.range.count() * size_of::<Vertex>()) as u64),
             }),
             &uniform_buffer,
         )),
@@ -302,7 +301,7 @@ fn mesh_manipulation(
                 .unwrap();
             pass.set_bind_group(0, &bind_groups.0, &[]);
             pass.set_pipeline(init_pipeline);
-            pass.dispatch_workgroups(SIZE.x / WORKGROUP_SIZE, SIZE.y / WORKGROUP_SIZE, 1);
+            pass.dispatch_workgroups(WORKGROUP_SIZE, 1, 1);
         }
         RenderState::Update => {
             let update_pipeline = pipeline_cache
@@ -310,7 +309,7 @@ fn mesh_manipulation(
                 .unwrap();
             pass.set_bind_group(0, &bind_groups.0, &[]);
             pass.set_pipeline(update_pipeline);
-            pass.dispatch_workgroups(SIZE.x / WORKGROUP_SIZE, SIZE.y / WORKGROUP_SIZE, 1);
+            pass.dispatch_workgroups(WORKGROUP_SIZE, 1, 1);
         }
     }
 }
