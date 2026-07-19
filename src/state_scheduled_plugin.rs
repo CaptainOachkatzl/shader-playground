@@ -8,23 +8,22 @@ macro_rules! state_scoped {
     (
         $app:expr,
         $state:expr,
-        $($items:tt),* $(,)?
+        $( $kind:ident ( $($args:tt)* ) ),* $(,)?
     ) => {{
-        let app = $app;
         $(
-            state_scoped!(@item app, $state, $items);
+            state_scoped!(@item $app, $state, $kind($($args)*));
         )*
     }};
 
-    (@item $app:ident, $state:expr, OnEnter($system:expr)) => {
+    (@item $app:expr, $state:expr, OnEnter($system:expr)) => {
         $app.add_systems(OnEnter($state), $system);
     };
 
-    (@item $app:ident, $state:expr, OnExit($system:expr)) => {
+    (@item $app:expr, $state:expr, OnExit($system:expr)) => {
         $app.add_systems(OnExit($state), $system);
     };
 
-    (@item $app:ident, $state:expr, RunInState($schedule:expr, $system:expr)) => {
+    (@item $app:expr, $state:expr, RunInState($schedule:expr, $system:expr)) => {
         $app.add_systems(
             $schedule,
             $system.run_if(in_state($state)),
@@ -35,6 +34,7 @@ macro_rules! state_scoped {
 struct TestPlugin;
 impl Plugin for TestPlugin {
     fn build(&self, app: &mut App) {
+        
         state_scoped!(
             app,
             TestState::A,
@@ -44,17 +44,17 @@ impl Plugin for TestPlugin {
         );
 
         let mut state_schedule = StateSchedule::new(app, TestState::A);
+        state_schedule
+            .add_on_enter_systems(test_system)
+            .add_on_exit_systems(test_system)
+            .add_state_scoped_systems(Update, test_system);
+
         app.add_systems(OnEnter(TestState::A), test_system)
             .add_systems(OnExit(TestState::A), test_system)
             .add_systems(
                 Update,
                 test_system_with_params.run_if(in_state(TestState::A)),
             );
-        state_schedule
-            .add_on_enter_systems(test_system)
-            .add_on_exit_systems(test_system)
-            .add_state_scoped_systems(Update, test_system);
-
         app.add_systems(OnEnter(TestState::A), test_system)
             .add_systems(OnExit(TestState::A), test_system)
             .add_systems(
