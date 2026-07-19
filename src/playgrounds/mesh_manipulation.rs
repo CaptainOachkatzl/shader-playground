@@ -6,17 +6,16 @@ use bevy::{
     render::{
         Extract, Render, RenderApp, RenderStartup, RenderSystems,
         extract_resource::ExtractResource,
-        render_asset::RenderAssets,
+        mesh::allocator::{MeshAllocator, MeshAllocatorSettings},
         render_resource::{
-            binding_types::{texture_storage_2d, uniform_buffer},
+            binding_types::{storage_buffer, uniform_buffer},
             *,
         },
         renderer::{RenderContext, RenderDevice, RenderGraph, RenderQueue},
-        texture::GpuImage,
     },
     shader::ShaderCacheError,
 };
-use std::borrow::Cow;
+use std::{borrow::Cow, num::NonZero};
 use xs_bevy_state_scoped_systems::add_state_scoped_systems;
 
 use crate::playgrounds::PlaygroundScene;
@@ -31,105 +30,65 @@ pub struct MeshManipulationPlugin;
 
 impl Plugin for MeshManipulationPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(GameOfLifeUniforms {
-            alive_color: LinearRgba::RED,
+        app.insert_resource(MeshManipulationUniforms {
+            pane_x_count: 64,
+            pane_y_count: 64,
         })
         .add_message::<RenderStateReset>()
-        .add_plugins(GameOfLifeComputePlugin);
+        //.add_plugins(MeshManipulationComputePlugin)
+        ;
 
         add_state_scoped_systems!(
             app,
             PlaygroundScene::MeshManipulation,
-            OnEnter(
-                (
-                    init_images,
-                    setup,
-                    bevy::asset::handle_internal_asset_events,
-                )
-                    .chain()
-            ),
-            OnExit(setup_3d_camera),
-            RunInState(Update, switch_textures),
+            OnEnter((init_mesh, setup, bevy::asset::handle_internal_asset_events,).chain()),
         );
     }
 }
 
-fn init_images(
+fn init_mesh(
     mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut reset: MessageWriter<RenderStateReset>,
 ) {
-    let mut image = Image::new_target_texture(SIZE.x, SIZE.y, TextureFormat::Rgba32Float, None);
-    image.asset_usage = RenderAssetUsages::RENDER_WORLD;
-    image.texture_descriptor.usage =
-        TextureUsages::COPY_DST | TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING;
-    let image0 = images.add(image.clone());
-    let image1 = images.add(image);
+    let mut mesh = Plane3d::default().mesh().size(5.0, 5.0).build();
+    mesh.asset_usage = RenderAssetUsages::RENDER_WORLD;
+    let mesh_handle = meshes.add(mesh);
 
-    commands.insert_resource(GameOfLifeImages {
-        texture_a: image0,
-        texture_b: image1,
-    });
+    commands.insert_resource(MeshData { mesh_handle });
 
     reset.write(RenderStateReset);
 }
 
-fn setup(
-    mut commands: Commands,
-    images: Res<GameOfLifeImages>,
-    camera_q: Query<Entity, With<Camera3d>>,
-) {
-    if let Ok(cam_entity) = camera_q.single() {
-        commands.entity(cam_entity).despawn();
-    }
-
-    commands.spawn((Camera2d, DespawnOnExit(PlaygroundScene::MeshManipulation)));
-
+fn setup(mut commands: Commands, mesh_data: Res<MeshData>) {
     commands.spawn((
         DespawnOnExit(PlaygroundScene::MeshManipulation),
-        Sprite {
-            image: images.texture_a.clone(),
-            custom_size: Some(SIZE.as_vec2()),
-            ..default()
-        },
+        Mesh3d(mesh_data.mesh_handle.clone()),
         Transform::from_scale(Vec3::splat(DISPLAY_FACTOR as f32)),
     ));
 }
 
-fn setup_3d_camera(mut commands: Commands) {
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(-6.0, 4.5, 0.).looking_at(Vec3::ZERO, Vec3::Y),
-        Msaa::Off,
-    ));
-}
+struct MeshManipulationComputePlugin;
 
-// Switch texture to display every frame to show the one that was written to most recently.
-fn switch_textures(images: Res<GameOfLifeImages>, mut sprite: Single<&mut Sprite>) {
-    if sprite.image == images.texture_a {
-        sprite.image = images.texture_b.clone();
-    } else {
-        sprite.image = images.texture_a.clone();
-    }
-}
-
-struct GameOfLifeComputePlugin;
-
-impl Plugin for GameOfLifeComputePlugin {
+impl Plugin for MeshManipulationComputePlugin {
     fn build(&self, app: &mut App) {
+        app.insert_resource(MeshAllocatorSettings {
+            extra_buffer_usages: BufferUsages::STORAGE,
+            ..default()
+        });
         let render_app = app.sub_app_mut(RenderApp);
         render_app
-            .init_resource::<GameOfLifeState>()
+            .init_resource::<RenderState>()
             .add_systems(
                 ExtractSchedule,
                 (
                     extract_state::<PlaygroundScene>,
                     reset_render_state,
-                    extract_conditionally::<GameOfLifeImages>,
-                    extract_conditionally::<GameOfLifeUniforms>,
+                    extract_conditionally::<MeshData>,
+                    extract_conditionally::<MeshManipulationUniforms>,
                 ),
             )
-            .add_systems(RenderStartup, init_game_of_life_pipeline)
+            .add_systems(RenderStartup, init_pipeline)
             .add_systems(
                 Render,
                 (
@@ -140,7 +99,7 @@ impl Plugin for GameOfLifeComputePlugin {
             )
             .add_systems(
                 RenderGraph,
-                game_of_life
+                mesh_manipulation
                     .before(camera_driver)
                     .run_if(in_state(PlaygroundScene::MeshManipulation)),
             );
@@ -149,10 +108,10 @@ impl Plugin for GameOfLifeComputePlugin {
 
 fn reset_render_state(
     mut reset: Extract<MessageReader<RenderStateReset>>,
-    mut render_state: ResMut<GameOfLifeState>,
+    mut render_state: ResMut<RenderState>,
 ) {
     if reset.read().count() > 0 {
-        *render_state = GameOfLifeState::Loading;
+        *render_state = RenderState::Loading;
     }
 }
 
@@ -185,121 +144,113 @@ fn extract_conditionally<R: ExtractResource<(), Mutability = Mutable>>(
 struct RenderStateReset;
 
 #[derive(Resource, Clone, ExtractResource)]
-struct GameOfLifeImages {
-    texture_a: Handle<Image>,
-    texture_b: Handle<Image>,
+struct MeshData {
+    mesh_handle: Handle<Mesh>,
 }
 
 #[derive(Resource, Clone, ExtractResource, ShaderType)]
-struct GameOfLifeUniforms {
-    alive_color: LinearRgba,
+struct MeshManipulationUniforms {
+    pane_x_count: u32,
+    pane_y_count: u32,
 }
 
 #[derive(Resource)]
-struct GameOfLifeImageBindGroups([BindGroup; 2]);
+struct MeshManipulationBindGroups(BindGroup);
 
 fn prepare_bind_group(
     mut commands: Commands,
-    pipeline: Res<GameOfLifePipeline>,
-    gpu_images: Res<RenderAssets<GpuImage>>,
-    game_of_life_images: Res<GameOfLifeImages>,
-    game_of_life_uniforms: Res<GameOfLifeUniforms>,
+    pipeline: Res<MeshManipulationPipeline>,
+    mesh_allocator: Res<MeshAllocator>,
+    mesh_data: Res<MeshData>,
+    uniforms: Res<MeshManipulationUniforms>,
     render_device: Res<RenderDevice>,
     pipeline_cache: Res<PipelineCache>,
     queue: Res<RenderQueue>,
 ) {
-    let view_a = gpu_images.get(&game_of_life_images.texture_a).unwrap();
-    let view_b = gpu_images.get(&game_of_life_images.texture_b).unwrap();
+    let vertex_slice = mesh_allocator
+        .mesh_vertex_slice(&mesh_data.mesh_handle.id())
+        .unwrap();
 
-    // Uniform buffer is used here to demonstrate how to set up a uniform in a compute shader
-    // Alternatives such as storage buffers or push constants may be more suitable for your use case
-    let mut uniform_buffer = UniformBuffer::from(game_of_life_uniforms.into_inner());
+    let mut uniform_buffer = UniformBuffer::from(uniforms.into_inner());
     uniform_buffer.write_buffer(&render_device, &queue);
 
-    let bind_group_0 = render_device.create_bind_group(
+    let bind_group = render_device.create_bind_group(
         None,
-        &pipeline_cache.get_bind_group_layout(&pipeline.texture_bind_group_layout),
+        &pipeline_cache.get_bind_group_layout(&pipeline.mesh_bind_group_layout),
         &BindGroupEntries::sequential((
-            &view_a.texture_view,
-            &view_b.texture_view,
+            BindingResource::Buffer(BufferBinding {
+                buffer: vertex_slice.buffer,
+                offset: vertex_slice.range.start as u64,
+                size: NonZero::new(vertex_slice.range.count() as u64),
+            }),
             &uniform_buffer,
         )),
     );
-    let bind_group_1 = render_device.create_bind_group(
-        None,
-        &pipeline_cache.get_bind_group_layout(&pipeline.texture_bind_group_layout),
-        &BindGroupEntries::sequential((
-            &view_b.texture_view,
-            &view_a.texture_view,
-            &uniform_buffer,
-        )),
-    );
-    commands.insert_resource(GameOfLifeImageBindGroups([bind_group_0, bind_group_1]));
+    commands.insert_resource(MeshManipulationBindGroups(bind_group));
 }
 
 #[derive(Resource)]
-struct GameOfLifePipeline {
-    texture_bind_group_layout: BindGroupLayoutDescriptor,
+struct MeshManipulationPipeline {
+    mesh_bind_group_layout: BindGroupLayoutDescriptor,
     init_pipeline: CachedComputePipelineId,
     update_pipeline: CachedComputePipelineId,
 }
 
-fn init_game_of_life_pipeline(
+fn init_pipeline(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     pipeline_cache: Res<PipelineCache>,
 ) {
-    let texture_bind_group_layout = BindGroupLayoutDescriptor::new(
-        "GameOfLifeImages",
+    let mesh_bind_group_layout = BindGroupLayoutDescriptor::new(
+        "MeshData",
         &BindGroupLayoutEntries::sequential(
             ShaderStages::COMPUTE,
             (
-                texture_storage_2d(TextureFormat::Rgba32Float, StorageTextureAccess::ReadOnly),
-                texture_storage_2d(TextureFormat::Rgba32Float, StorageTextureAccess::WriteOnly),
-                uniform_buffer::<GameOfLifeUniforms>(false),
+                storage_buffer::<Vec<Vec3>>(false),
+                uniform_buffer::<MeshManipulationUniforms>(false),
             ),
         ),
     );
     let shader = asset_server.load(SHADER_ASSET_PATH);
     let init_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
-        layout: vec![texture_bind_group_layout.clone()],
+        layout: vec![mesh_bind_group_layout.clone()],
         shader: shader.clone(),
         entry_point: Some(Cow::from("init")),
         ..default()
     });
     let update_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
-        layout: vec![texture_bind_group_layout.clone()],
+        layout: vec![mesh_bind_group_layout.clone()],
         shader,
         entry_point: Some(Cow::from("update")),
         ..default()
     });
 
-    commands.insert_resource(GameOfLifePipeline {
-        texture_bind_group_layout,
+    commands.insert_resource(MeshManipulationPipeline {
+        mesh_bind_group_layout,
         init_pipeline,
         update_pipeline,
     });
 }
 
 #[derive(Resource, Default)]
-enum GameOfLifeState {
+enum RenderState {
     #[default]
     Loading,
     Init,
-    Update(usize),
+    Update,
 }
 
 fn update(
-    pipeline: Res<GameOfLifePipeline>,
+    pipeline: Res<MeshManipulationPipeline>,
     pipeline_cache: Res<PipelineCache>,
-    mut state: ResMut<GameOfLifeState>,
+    mut state: ResMut<RenderState>,
 ) {
     // if the corresponding pipeline has loaded, transition to the next stage
     match *state {
-        GameOfLifeState::Loading => {
+        RenderState::Loading => {
             match pipeline_cache.get_compute_pipeline_state(pipeline.init_pipeline) {
                 CachedPipelineState::Ok(_) => {
-                    *state = GameOfLifeState::Init;
+                    *state = RenderState::Init;
                 }
                 // If the shader hasn't loaded yet, just wait.
                 CachedPipelineState::Err(ShaderCacheError::ShaderNotLoaded(_)) => {}
@@ -309,29 +260,23 @@ fn update(
                 _ => {}
             }
         }
-        GameOfLifeState::Init => {
+        RenderState::Init => {
             if let CachedPipelineState::Ok(_) =
                 pipeline_cache.get_compute_pipeline_state(pipeline.update_pipeline)
             {
-                *state = GameOfLifeState::Update(1);
+                *state = RenderState::Update;
             }
         }
-        GameOfLifeState::Update(0) => {
-            *state = GameOfLifeState::Update(1);
-        }
-        GameOfLifeState::Update(1) => {
-            *state = GameOfLifeState::Update(0);
-        }
-        GameOfLifeState::Update(_) => unreachable!(),
+        RenderState::Update => {}
     }
 }
 
-fn game_of_life(
+fn mesh_manipulation(
     mut render_context: RenderContext,
-    bind_groups: Res<GameOfLifeImageBindGroups>,
+    bind_groups: Res<MeshManipulationBindGroups>,
     pipeline_cache: Res<PipelineCache>,
-    pipeline: Res<GameOfLifePipeline>,
-    state: Res<GameOfLifeState>,
+    pipeline: Res<MeshManipulationPipeline>,
+    state: Res<RenderState>,
 ) {
     let mut pass = render_context
         .command_encoder()
@@ -339,20 +284,20 @@ fn game_of_life(
 
     // select the pipeline based on the current state
     match *state {
-        GameOfLifeState::Loading => {}
-        GameOfLifeState::Init => {
+        RenderState::Loading => {}
+        RenderState::Init => {
             let init_pipeline = pipeline_cache
                 .get_compute_pipeline(pipeline.init_pipeline)
                 .unwrap();
-            pass.set_bind_group(0, &bind_groups.0[0], &[]);
+            pass.set_bind_group(0, &bind_groups.0, &[]);
             pass.set_pipeline(init_pipeline);
             pass.dispatch_workgroups(SIZE.x / WORKGROUP_SIZE, SIZE.y / WORKGROUP_SIZE, 1);
         }
-        GameOfLifeState::Update(index) => {
+        RenderState::Update => {
             let update_pipeline = pipeline_cache
                 .get_compute_pipeline(pipeline.update_pipeline)
                 .unwrap();
-            pass.set_bind_group(0, &bind_groups.0[index], &[]);
+            pass.set_bind_group(0, &bind_groups.0, &[]);
             pass.set_pipeline(update_pipeline);
             pass.dispatch_workgroups(SIZE.x / WORKGROUP_SIZE, SIZE.y / WORKGROUP_SIZE, 1);
         }
