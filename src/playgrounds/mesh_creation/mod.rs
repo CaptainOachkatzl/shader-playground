@@ -18,7 +18,7 @@ use bevy::{
 use std::{borrow::Cow, num::NonZero};
 use xs_bevy_state_scoped_systems::add_state_scoped_systems;
 
-use crate::playgrounds::PlaygroundScene;
+use crate::{playgrounds::PlaygroundScene, utils::extract_state};
 
 const SHADER_ASSET_PATH: &str = "shaders/mesh_creation.wgsl";
 
@@ -29,7 +29,7 @@ pub struct MeshCreationPlugin;
 
 impl Plugin for MeshCreationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<DeformationMessage>()
+        app.add_message::<RenderPluginMessage>()
             .add_plugins(MeshCreationComputePlugin);
 
         add_state_scoped_systems!(
@@ -48,8 +48,8 @@ fn trigger_deformation_pressed(keyboard: Res<ButtonInput<KeyCode>>) -> bool {
     keyboard.just_pressed(KeyCode::Space)
 }
 
-fn send_mesh_deform_message(mut deformation_msg_queue: MessageWriter<DeformationMessage>) {
-    deformation_msg_queue.write(DeformationMessage);
+fn send_mesh_deform_message(mut msg_queue: MessageWriter<RenderPluginMessage>) {
+    msg_queue.write(RenderPluginMessage(RenderPluginActions::StartDeformation));
 }
 
 fn init_mesh(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
@@ -63,25 +63,27 @@ fn init_mesh(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
 fn setup(
     mut commands: Commands,
     mesh_data: Res<MeshData>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut msg_queue: MessageWriter<RenderPluginMessage>,
 ) {
     commands.init_resource::<MeshCreationUniforms>();
+    let mesh_handle = mesh_data.mesh_handle.clone();
 
-    commands.spawn((
-        DespawnOnExit(PlaygroundScene::MeshCreation),
-        Mesh3d(mesh_data.mesh_handle.clone()),
-        MeshMaterial3d(materials.add(StandardMaterial::default())),
-        Transform::default(),
-    ));
-    commands.spawn((
-        DespawnOnExit(PlaygroundScene::MeshCreation),
-        PointLight {
-            shadow_maps_enabled: true,
-            intensity: 2_000_000.0,
-            ..Default::default()
-        },
-        Transform::from_xyz(4.0, 8.0, 4.0),
-    ));
+    let scene = bsn_list! {
+            DespawnOnExit<PlaygroundScene>(PlaygroundScene::MeshCreation)
+            Mesh3d(mesh_handle)
+            MeshMaterial3d<StandardMaterial>(asset_value(Color::WHITE))
+            Transform,
+
+            DespawnOnExit<PlaygroundScene>(PlaygroundScene::MeshCreation)
+            PointLight {
+                shadow_maps_enabled: true,
+                intensity: 2_000_000.0,
+            }
+            Transform::from_xyz(4.0, 8.0, 4.0),
+    };
+
+    commands.spawn_scene_list(scene);
+    msg_queue.write(RenderPluginMessage(RenderPluginActions::Reset));
 }
 
 struct MeshCreationComputePlugin;
@@ -94,8 +96,8 @@ impl Plugin for MeshCreationComputePlugin {
             .add_systems(
                 ExtractSchedule,
                 (
+                    handle_messages,
                     extract_state::<PlaygroundScene>,
-                    reset_render_state,
                     extract_conditionally::<MeshData>,
                     extract_conditionally::<MeshCreationUniforms>,
                 ),
@@ -109,7 +111,7 @@ impl Plugin for MeshCreationComputePlugin {
                 Render,
                 (
                     prepare_bind_group.in_set(RenderSystems::PrepareBindGroups),
-                    update_mesh_creation_state.in_set(RenderSystems::Prepare),
+                    poll_pipeline_loading.in_set(RenderSystems::Prepare),
                 )
             ),
             RunInState(RenderGraph, execute_pipeline.before(camera_driver))
@@ -117,17 +119,28 @@ impl Plugin for MeshCreationComputePlugin {
     }
 }
 
-fn reset_render_state(
-    mut reset: Extract<MessageReader<DeformationMessage>>,
-    mut render_state: ResMut<MeshCreationState>,
-) {
-    if reset.read().count() > 0 {
-        *render_state = MeshCreationState::Loading;
-    }
+enum RenderPluginActions {
+    Reset,
+    StartDeformation,
 }
 
-fn extract_state<S: States>(mut commands: Commands, state: Extract<Res<State<S>>>) {
-    commands.insert_resource(State::new(state.get().clone()));
+#[derive(Message)]
+struct RenderPluginMessage(RenderPluginActions);
+
+fn handle_messages(
+    mut deformation_messages: Extract<MessageReader<RenderPluginMessage>>,
+    mut mesh_creation_state: ResMut<MeshCreationState>,
+) {
+    for message in deformation_messages.read() {
+        match message.0 {
+            RenderPluginActions::Reset => *mesh_creation_state = MeshCreationState::Loading,
+            RenderPluginActions::StartDeformation => {
+                if *mesh_creation_state == MeshCreationState::Waiting {
+                    *mesh_creation_state = MeshCreationState::Execute;
+                }
+            }
+        }
+    }
 }
 
 fn extract_conditionally<R: ExtractResource<(), Mutability = Mutable>>(
@@ -150,9 +163,6 @@ fn extract_conditionally<R: ExtractResource<(), Mutability = Mutable>>(
         }
     }
 }
-
-#[derive(Message)]
-struct DeformationMessage;
 
 #[derive(Resource, Clone, ExtractResource)]
 struct MeshData {
@@ -202,23 +212,16 @@ fn init_pipeline(
         ),
     );
     let shader = asset_server.load(SHADER_ASSET_PATH);
-    let init_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+    let pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
         layout: vec![mesh_bind_group_layout.clone()],
         shader: shader.clone(),
         entry_point: Some(Cow::from("init")),
         ..default()
     });
-    let update_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
-        layout: vec![mesh_bind_group_layout.clone()],
-        shader,
-        entry_point: Some(Cow::from("update")),
-        ..default()
-    });
 
     commands.insert_resource(MeshCreationPipeline {
         mesh_bind_group_layout,
-        init_pipeline,
-        update_pipeline,
+        pipeline,
     });
 
     let debug_buffer = render_device.create_buffer(&BufferDescriptor {
@@ -287,19 +290,19 @@ fn prepare_bind_group(
 #[derive(Resource)]
 struct MeshCreationPipeline {
     mesh_bind_group_layout: BindGroupLayoutDescriptor,
-    init_pipeline: CachedComputePipelineId,
-    update_pipeline: CachedComputePipelineId,
+    pipeline: CachedComputePipelineId,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, PartialEq, Eq)]
 enum MeshCreationState {
     #[default]
     Loading,
-    Init,
+    Waiting,
+    Execute,
     Finished,
 }
 
-fn update_mesh_creation_state(
+fn poll_pipeline_loading(
     pipeline: Res<MeshCreationPipeline>,
     pipeline_cache: Res<PipelineCache>,
     mut state: ResMut<MeshCreationState>,
@@ -307,9 +310,9 @@ fn update_mesh_creation_state(
     // if the corresponding pipeline has loaded, transition to the next stage
     match *state {
         MeshCreationState::Loading => {
-            match pipeline_cache.get_compute_pipeline_state(pipeline.init_pipeline) {
+            match pipeline_cache.get_compute_pipeline_state(pipeline.pipeline) {
                 CachedPipelineState::Ok(_) => {
-                    *state = MeshCreationState::Init;
+                    *state = MeshCreationState::Waiting;
                 }
                 // If the shader hasn't loaded yet, just wait.
                 CachedPipelineState::Err(ShaderCacheError::ShaderNotLoaded(_)) => {}
@@ -319,14 +322,7 @@ fn update_mesh_creation_state(
                 _ => {}
             }
         }
-        MeshCreationState::Init => {
-            if let CachedPipelineState::Ok(_) =
-                pipeline_cache.get_compute_pipeline_state(pipeline.update_pipeline)
-            {
-                *state = MeshCreationState::Finished;
-            }
-        }
-        MeshCreationState::Finished => {}
+        _ => {}
     }
 }
 
@@ -335,28 +331,26 @@ fn execute_pipeline(
     bind_groups: Res<MeshCreationBindGroups>,
     pipeline_cache: Res<PipelineCache>,
     pipeline: Res<MeshCreationPipeline>,
-    state: Res<MeshCreationState>,
+    mut state: ResMut<MeshCreationState>,
     #[allow(unused)] debug_buffer: Res<DebugBuffer>,
 ) {
-    let mut pass = render_context
-        .command_encoder()
-        .begin_compute_pass(&ComputePassDescriptor::default());
-
     // select the pipeline based on the current state
     match *state {
-        MeshCreationState::Loading => {}
-        MeshCreationState::Init => {
-            let init_pipeline = pipeline_cache
-                .get_compute_pipeline(pipeline.init_pipeline)
+        MeshCreationState::Execute => {
+            let mut pass = render_context
+                .command_encoder()
+                .begin_compute_pass(&ComputePassDescriptor::default());
+
+            let mesh_creation_pipeline = pipeline_cache
+                .get_compute_pipeline(pipeline.pipeline)
                 .unwrap();
             pass.set_bind_group(0, &bind_groups.0, &[]);
-            pass.set_pipeline(init_pipeline);
+            pass.set_pipeline(mesh_creation_pipeline);
             pass.dispatch_workgroups(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1);
+            *state = MeshCreationState::Finished;
         }
-        MeshCreationState::Finished => {}
+        _ => {}
     }
-
-    drop(pass);
 
     //print_shader_debug_value(&mut render_context, &debug_buffer);
 }

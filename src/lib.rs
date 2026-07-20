@@ -3,6 +3,7 @@
 mod camera;
 mod playgrounds;
 mod settings;
+mod utils;
 
 #[allow(unused)]
 use bevy::{
