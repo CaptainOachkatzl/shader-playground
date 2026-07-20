@@ -66,7 +66,6 @@ fn init_mesh(
         .build();
     mesh.asset_usage = RenderAssetUsages::RENDER_WORLD;
     uniforms.vertex_count = mesh.count_vertices() as u32;
-    println!("{:?}", uniforms);
     let mesh_handle = meshes.add(mesh);
 
     commands.insert_resource(MeshData { mesh_handle });
