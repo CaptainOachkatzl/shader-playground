@@ -49,9 +49,7 @@ fn init_mesh(
     mut reset: MessageWriter<RenderStateReset>,
 ) {
     let mut mesh = Plane3d::default().mesh().size(5.0, 5.0).build();
-    println!("get_vertex_size: {}", mesh.get_vertex_size());
-    println!("get_vertex_buffer_size: {}", mesh.get_vertex_buffer_size());
-    mesh.asset_usage = RenderAssetUsages::default();
+    mesh.asset_usage = RenderAssetUsages::RENDER_WORLD;
     let mesh_handle = meshes.add(mesh);
 
     commands.insert_resource(MeshData { mesh_handle });
@@ -102,10 +100,10 @@ impl Plugin for MeshManipulationComputePlugin {
                 Render,
                 (
                     prepare_bind_group.in_set(RenderSystems::PrepareBindGroups),
-                    update.in_set(RenderSystems::Prepare),
+                    update_render_state.in_set(RenderSystems::Prepare),
                 )
             ),
-            RunInState(RenderGraph, mesh_manipulation.before(camera_driver))
+            RunInState(RenderGraph, execute_pipeline.before(camera_driver))
         );
     }
 }
@@ -289,7 +287,7 @@ enum RenderState {
     Update,
 }
 
-fn update(
+fn update_render_state(
     pipeline: Res<MeshManipulationPipeline>,
     pipeline_cache: Res<PipelineCache>,
     mut state: ResMut<RenderState>,
@@ -320,7 +318,7 @@ fn update(
     }
 }
 
-fn mesh_manipulation(
+fn execute_pipeline(
     mut render_context: RenderContext,
     bind_groups: Res<MeshManipulationBindGroups>,
     pipeline_cache: Res<PipelineCache>,
