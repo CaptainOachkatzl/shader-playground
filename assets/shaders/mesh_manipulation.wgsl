@@ -17,12 +17,11 @@ struct MeshManipulationUniforms {
 
 @compute @workgroup_size(1)
 fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
-    debug[0] = config.pane_x_count;
-    vertices[1] = 100.;
+    vertices[1] = 1.;
+    debug[0] = u32(vertices[1]);
 }
 
 @compute @workgroup_size(1)
 fn update(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
-    debug[0] += 1;
-    vertices[1] = -100.;
+    debug[0] = u32(vertices[1]);
 }

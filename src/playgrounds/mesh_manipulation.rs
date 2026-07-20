@@ -47,14 +47,10 @@ fn init_mesh(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut reset: MessageWriter<RenderStateReset>,
-    // mut layouts: ResMut<MeshVertexBufferLayouts>,
 ) {
     let mut mesh = Plane3d::default().mesh().size(5.0, 5.0).build();
+    println!("get_vertex_size: {}", mesh.get_vertex_size());
     println!("get_vertex_buffer_size: {}", mesh.get_vertex_buffer_size());
-    // println!(
-    //     "get_mesh_vertex_buffer_layout: {:?}",
-    //     mesh.get_mesh_vertex_buffer_layout(&mut layouts)
-    // );
     mesh.asset_usage = RenderAssetUsages::default();
     let mesh_handle = meshes.add(mesh);
 
@@ -162,6 +158,13 @@ struct MeshManipulationUniforms {
     pane_y_count: u32,
 }
 
+#[derive(ShaderType)]
+struct Vertex {
+    position: Vec3,
+    normal: Vec3,
+    uv: Vec2,
+}
+
 #[derive(Resource)]
 struct MeshManipulationBindGroups(BindGroup);
 
@@ -243,6 +246,11 @@ fn prepare_bind_group(
         .mesh_vertex_slice(&mesh_data.mesh_handle.id())
         .unwrap();
 
+    let vertex_slice_stride = size_of::<Vertex>() as u64;
+    let vertex_slice_size =
+        (vertex_slice.range.end - vertex_slice.range.start) as u64 * vertex_slice_stride;
+    let vertex_slice_offset = vertex_slice.range.start as u64 * vertex_slice_stride;
+
     let mut uniform_buffer = UniformBuffer::from(uniforms.into_inner());
     uniform_buffer.write_buffer(&render_device, &queue);
 
@@ -252,8 +260,8 @@ fn prepare_bind_group(
         &BindGroupEntries::sequential((
             BindingResource::Buffer(BufferBinding {
                 buffer: vertex_slice.buffer,
-                offset: vertex_slice.range.start as u64,
-                size: NonZero::new((vertex_slice.range.count() * 48) as u64),
+                offset: vertex_slice_offset,
+                size: NonZero::new(vertex_slice_size),
             }),
             BindingResource::Buffer(BufferBinding {
                 buffer: &debug_buffer.buffer,
@@ -271,13 +279,6 @@ struct MeshManipulationPipeline {
     mesh_bind_group_layout: BindGroupLayoutDescriptor,
     init_pipeline: CachedComputePipelineId,
     update_pipeline: CachedComputePipelineId,
-}
-
-#[derive(ShaderType)]
-struct Vertex {
-    position: Vec3,
-    normal: Vec3,
-    uv: Vec2,
 }
 
 #[derive(Resource, Default)]
@@ -325,7 +326,7 @@ fn mesh_manipulation(
     pipeline_cache: Res<PipelineCache>,
     pipeline: Res<MeshManipulationPipeline>,
     state: Res<RenderState>,
-    debug_buffer: Res<DebugBuffer>,
+    #[allow(unused)] debug_buffer: Res<DebugBuffer>,
 ) {
     let mut pass = render_context
         .command_encoder()
@@ -354,6 +355,11 @@ fn mesh_manipulation(
 
     drop(pass);
 
+    //print_shader_debug_value(&mut render_context, &debug_buffer);
+}
+
+#[allow(unused)]
+fn print_shader_debug_value(render_context: &mut RenderContext, debug_buffer: &DebugBuffer) {
     let encoder = render_context.command_encoder();
 
     encoder.copy_buffer_to_buffer(&debug_buffer.buffer, 0, &debug_buffer.readback, 0, 4);
