@@ -170,79 +170,11 @@ struct DebugBuffer {
     readback: Buffer,
 }
 
-fn prepare_bind_group(
-    mut commands: Commands,
-    pipeline: Res<MeshManipulationPipeline>,
-    mesh_allocator: Res<MeshAllocator>,
-    mesh_data: Res<MeshData>,
-    uniforms: Res<MeshManipulationUniforms>,
-    render_device: Res<RenderDevice>,
-    pipeline_cache: Res<PipelineCache>,
-    queue: Res<RenderQueue>,
-) {
-    let vertex_slice = mesh_allocator
-        .mesh_vertex_slice(&mesh_data.mesh_handle.id())
-        .unwrap();
-
-    let mut uniform_buffer = UniformBuffer::from(uniforms.into_inner());
-    uniform_buffer.write_buffer(&render_device, &queue);
-
-    let debug_buffer = render_device.create_buffer(&BufferDescriptor {
-        label: Some("debug buffer"),
-        size: 4,
-        usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
-        mapped_at_creation: false,
-    });
-
-    let debug_readback = render_device.create_buffer(&BufferDescriptor {
-        label: Some("debug readback"),
-        size: 4,
-        usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
-
-    let bind_group = render_device.create_bind_group(
-        Some("mesh manipulation bind group"),
-        &pipeline_cache.get_bind_group_layout(&pipeline.mesh_bind_group_layout),
-        &BindGroupEntries::sequential((
-            BindingResource::Buffer(BufferBinding {
-                buffer: vertex_slice.buffer,
-                offset: vertex_slice.range.start as u64,
-                size: NonZero::new((vertex_slice.range.count() * 48) as u64),
-            }),
-            BindingResource::Buffer(BufferBinding {
-                buffer: &debug_buffer,
-                offset: 0,
-                size: NonZero::new(4),
-            }),
-            &uniform_buffer,
-        )),
-    );
-    commands.insert_resource(MeshManipulationBindGroups(bind_group));
-    commands.insert_resource(DebugBuffer {
-        buffer: debug_buffer,
-        readback: debug_readback,
-    });
-}
-
-#[derive(Resource)]
-struct MeshManipulationPipeline {
-    mesh_bind_group_layout: BindGroupLayoutDescriptor,
-    init_pipeline: CachedComputePipelineId,
-    update_pipeline: CachedComputePipelineId,
-}
-
-#[derive(ShaderType)]
-struct Vertex {
-    position: Vec3,
-    normal: Vec3,
-    uv: Vec2,
-}
-
 fn init_pipeline(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     pipeline_cache: Res<PipelineCache>,
+    render_device: Res<RenderDevice>,
 ) {
     let mesh_bind_group_layout = BindGroupLayoutDescriptor::new(
         "MeshData",
@@ -274,6 +206,77 @@ fn init_pipeline(
         init_pipeline,
         update_pipeline,
     });
+
+    let debug_buffer = render_device.create_buffer(&BufferDescriptor {
+        label: Some("debug buffer"),
+        size: 4,
+        usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
+        mapped_at_creation: false,
+    });
+
+    let debug_readback = render_device.create_buffer(&BufferDescriptor {
+        label: Some("debug readback"),
+        size: 4,
+        usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+
+    commands.insert_resource(DebugBuffer {
+        buffer: debug_buffer,
+        readback: debug_readback,
+    });
+}
+
+fn prepare_bind_group(
+    mut commands: Commands,
+    pipeline: Res<MeshManipulationPipeline>,
+    mesh_allocator: Res<MeshAllocator>,
+    mesh_data: Res<MeshData>,
+    uniforms: Res<MeshManipulationUniforms>,
+    debug_buffer: Res<DebugBuffer>,
+    render_device: Res<RenderDevice>,
+    pipeline_cache: Res<PipelineCache>,
+    queue: Res<RenderQueue>,
+) {
+    let vertex_slice = mesh_allocator
+        .mesh_vertex_slice(&mesh_data.mesh_handle.id())
+        .unwrap();
+
+    let mut uniform_buffer = UniformBuffer::from(uniforms.into_inner());
+    uniform_buffer.write_buffer(&render_device, &queue);
+
+    let bind_group = render_device.create_bind_group(
+        Some("mesh manipulation bind group"),
+        &pipeline_cache.get_bind_group_layout(&pipeline.mesh_bind_group_layout),
+        &BindGroupEntries::sequential((
+            BindingResource::Buffer(BufferBinding {
+                buffer: vertex_slice.buffer,
+                offset: vertex_slice.range.start as u64,
+                size: NonZero::new((vertex_slice.range.count() * 48) as u64),
+            }),
+            BindingResource::Buffer(BufferBinding {
+                buffer: &debug_buffer.buffer,
+                offset: 0,
+                size: NonZero::new(4),
+            }),
+            &uniform_buffer,
+        )),
+    );
+    commands.insert_resource(MeshManipulationBindGroups(bind_group));
+}
+
+#[derive(Resource)]
+struct MeshManipulationPipeline {
+    mesh_bind_group_layout: BindGroupLayoutDescriptor,
+    init_pipeline: CachedComputePipelineId,
+    update_pipeline: CachedComputePipelineId,
+}
+
+#[derive(ShaderType)]
+struct Vertex {
+    position: Vec3,
+    normal: Vec3,
+    uv: Vec2,
 }
 
 #[derive(Resource, Default)]
