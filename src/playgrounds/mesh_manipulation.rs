@@ -22,15 +22,18 @@ use crate::playgrounds::PlaygroundScene;
 
 const SHADER_ASSET_PATH: &str = "shaders/mesh_manipulation.wgsl";
 
-const WORKGROUP_SIZE: u32 = 1;
+const WORKGROUP_SIZE_X: u32 = 32;
+const WORKGROUP_SIZE_Y: u32 = 32;
 
 pub struct MeshManipulationPlugin;
 
 impl Plugin for MeshManipulationPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(MeshManipulationUniforms {
-            pane_x_count: 64,
-            pane_y_count: 64,
+            subdivisions_x: WORKGROUP_SIZE_X - 2,
+            subdivisions_z: WORKGROUP_SIZE_Y - 2,
+            vertex_count: 0,
+            animation_progress: 0.0,
         })
         .add_message::<RenderStateReset>()
         .add_plugins(MeshManipulationComputePlugin);
@@ -39,17 +42,30 @@ impl Plugin for MeshManipulationPlugin {
             app,
             PlaygroundScene::MeshManipulation,
             OnEnter((init_mesh, setup, bevy::asset::handle_internal_asset_events,).chain()),
+            RunInState(Update, update_animation_progress),
         );
     }
+}
+
+fn update_animation_progress(time: Res<Time>, mut uniforms: ResMut<MeshManipulationUniforms>) {
+    uniforms.animation_progress = time.elapsed_secs() % 1.0;
 }
 
 fn init_mesh(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut uniforms: ResMut<MeshManipulationUniforms>,
     mut reset: MessageWriter<RenderStateReset>,
 ) {
-    let mut mesh = Plane3d::default().mesh().size(5.0, 5.0).build();
+    let mut mesh = Plane3d::default()
+        .mesh()
+        .size(5.0, 5.0)
+        .subdivisions_x(uniforms.subdivisions_x)
+        .subdivisions_z(uniforms.subdivisions_z)
+        .build();
     mesh.asset_usage = RenderAssetUsages::RENDER_WORLD;
+    uniforms.vertex_count = mesh.count_vertices() as u32;
+    println!("{:?}", uniforms);
     let mesh_handle = meshes.add(mesh);
 
     commands.insert_resource(MeshData { mesh_handle });
@@ -67,6 +83,15 @@ fn setup(
         Mesh3d(mesh_data.mesh_handle.clone()),
         MeshMaterial3d(materials.add(StandardMaterial::default())),
         Transform::default(),
+    ));
+    commands.spawn((
+        DespawnOnExit(PlaygroundScene::MeshManipulation),
+        PointLight {
+            shadow_maps_enabled: true,
+            intensity: 2_000_000.0,
+            ..Default::default()
+        },
+        Transform::from_xyz(4.0, 8.0, 4.0),
     ));
 }
 
@@ -150,10 +175,12 @@ struct MeshData {
     mesh_handle: Handle<Mesh>,
 }
 
-#[derive(Resource, Clone, ExtractResource, ShaderType)]
+#[derive(Resource, Debug, Clone, ExtractResource, ShaderType)]
 struct MeshManipulationUniforms {
-    pane_x_count: u32,
-    pane_y_count: u32,
+    subdivisions_x: u32,
+    subdivisions_z: u32,
+    vertex_count: u32,
+    animation_progress: f32,
 }
 
 #[derive(ShaderType)]
@@ -339,7 +366,7 @@ fn execute_pipeline(
                 .unwrap();
             pass.set_bind_group(0, &bind_groups.0, &[]);
             pass.set_pipeline(init_pipeline);
-            pass.dispatch_workgroups(WORKGROUP_SIZE, 1, 1);
+            pass.dispatch_workgroups(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1);
         }
         RenderState::Update => {
             let update_pipeline = pipeline_cache
@@ -347,7 +374,7 @@ fn execute_pipeline(
                 .unwrap();
             pass.set_bind_group(0, &bind_groups.0, &[]);
             pass.set_pipeline(update_pipeline);
-            pass.dispatch_workgroups(WORKGROUP_SIZE, 1, 1);
+            pass.dispatch_workgroups(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1);
         }
     }
 
