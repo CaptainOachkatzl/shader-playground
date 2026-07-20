@@ -186,8 +186,8 @@ fn init_pipeline(
             ShaderStages::COMPUTE,
             (
                 storage_buffer::<Vec<Vertex>>(false),
-                storage_buffer::<u32>(false),
                 uniform_buffer::<MeshManipulationUniforms>(false),
+                storage_buffer::<u32>(false),
             ),
         ),
     );
@@ -263,12 +263,12 @@ fn prepare_bind_group(
                 offset: vertex_slice_offset,
                 size: NonZero::new(vertex_slice_size),
             }),
+            &uniform_buffer,
             BindingResource::Buffer(BufferBinding {
                 buffer: &debug_buffer.buffer,
                 offset: 0,
                 size: NonZero::new(4),
             }),
-            &uniform_buffer,
         )),
     );
     commands.insert_resource(MeshManipulationBindGroups(bind_group));
