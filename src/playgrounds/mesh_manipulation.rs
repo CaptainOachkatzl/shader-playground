@@ -103,14 +103,11 @@ impl Plugin for MeshManipulationComputePlugin {
                 Render,
                 (
                     prepare_bind_group.in_set(RenderSystems::PrepareBindGroups),
-                    update.in_set(RenderSystems::Prepare),
+                    (update, mesh_manipulation)
+                        .chain()
+                        .in_set(RenderSystems::Prepare)
+                        .after(prepare_bind_group),
                 )
-                    .run_if(in_state(PlaygroundScene::MeshManipulation)),
-            )
-            .add_systems(
-                RenderGraph,
-                mesh_manipulation
-                    .before(camera_driver)
                     .run_if(in_state(PlaygroundScene::MeshManipulation)),
             );
     }
@@ -253,7 +250,7 @@ fn init_pipeline(
             ShaderStages::COMPUTE,
             (
                 storage_buffer::<Vec<Vertex>>(false),
-                storage_buffer::<Vec<u32>>(false),
+                storage_buffer::<u32>(false),
                 uniform_buffer::<MeshManipulationUniforms>(false),
             ),
         ),
@@ -357,20 +354,33 @@ fn mesh_manipulation(
 
     encoder.copy_buffer_to_buffer(&debug_buffer.buffer, 0, &debug_buffer.readback, 0, 4);
 
-    let debug_buffer = debug_buffer.clone();
-    let readback = debug_buffer.readback.clone();
-    let slice = readback.slice(..);
+    let _ = render_context
+        .render_device()
+        .wgpu_device()
+        .poll(PollType::Wait {
+            submission_index: None,
+            timeout: None,
+        });
 
-    slice.map_async(MapMode::Read, move |result| {
-        let slice = debug_buffer.readback.slice(..);
-        if result.is_ok() {
-            let data = slice.get_mapped_range();
+    let slice = debug_buffer.readback.slice(..);
 
-            let value = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+    slice.map_async(MapMode::Read, |_| {});
 
-            println!("debug value = {}", value);
-        }
-    });
+    let _ = render_context
+        .render_device()
+        .wgpu_device()
+        .poll(PollType::Wait {
+            submission_index: None,
+            timeout: None,
+        });
 
-    readback.unmap();
+    let data = slice.get_mapped_range();
+
+    let value = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+
+    println!("{value}");
+
+    drop(data);
+
+    debug_buffer.readback.unmap();
 }

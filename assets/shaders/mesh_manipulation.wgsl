@@ -17,13 +17,10 @@ struct MeshManipulationUniforms {
 
 @compute @workgroup_size(1)
 fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
-    let i = invocation_id.x;
     debug[0] = 1234;
-
-    vertices[1] = 100.0;
 }
 
 @compute @workgroup_size(1)
 fn update(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
-    vertices[1] = 100.0;
+    debug[0] = 2345;
 }
