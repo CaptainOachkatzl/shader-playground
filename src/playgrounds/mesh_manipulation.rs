@@ -48,7 +48,8 @@ impl Plugin for MeshManipulationPlugin {
 }
 
 fn update_animation_progress(time: Res<Time>, mut uniforms: ResMut<MeshManipulationUniforms>) {
-    uniforms.animation_progress = time.elapsed_secs() % 1.0;
+    let frequency = 0.5;
+    uniforms.animation_progress = (time.elapsed_secs() * frequency) % 1.0;
 }
 
 fn init_mesh(

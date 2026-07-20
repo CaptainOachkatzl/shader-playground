@@ -25,7 +25,7 @@ fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
     let y = invocation_id.y;
     let index = y * WORKGROUP_SIZE + x;
 
-    vertices[index].position_u.y = calc_height(x, 1.0, 0.3);;
+    vertices[index].position_u.y = calc_height(x, 0.3);;
 }
 
 @compute @workgroup_size(WORKGROUP_SIZE,WORKGROUP_SIZE,1)
@@ -34,11 +34,12 @@ fn update(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
     let y = invocation_id.y;
     let index = y * WORKGROUP_SIZE + x;
 
-    vertices[index].position_u.y = calc_height(x, 0.5, 0.3);
+    vertices[index].position_u.y = calc_height(x, 0.1);
 }
 
-fn calc_height(x: u32, frequency: f32, amplitude: f32) -> f32 {
+fn calc_height(x: u32, amplitude: f32) -> f32 {
     const PI_2 = 2 * 3.1415;
+    const wave_count = 3;
     let x_norm = f32(x) / f32(WORKGROUP_SIZE);
-    return amplitude * sin(PI_2 * x_norm + PI_2 * frequency * config.animation_progress);
+    return amplitude * sin(PI_2 * x_norm * wave_count + PI_2 * config.animation_progress);
 }
