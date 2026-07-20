@@ -6,6 +6,7 @@ pub mod paint_cube_face;
 pub mod rainbow_cube;
 pub mod specialized_pipeline;
 pub mod mesh_manipulation;
+pub mod mesh_creation;
 
 use bevy::prelude::*;
 use strum::{EnumIter, IntoEnumIterator};
@@ -21,6 +22,7 @@ pub enum PlaygroundScene {
     SpecializedPipeline,
     ComputeShader,
     MeshManipulation,
+    MeshCreation,
 }
 
 impl PlaygroundScene {
@@ -34,6 +36,7 @@ impl PlaygroundScene {
             PlaygroundScene::SpecializedPipeline => KeyCode::Digit6,
             PlaygroundScene::ComputeShader => KeyCode::Digit7,
             PlaygroundScene::MeshManipulation => KeyCode::Digit8,
+            PlaygroundScene::MeshCreation => KeyCode::Digit9,
         }
     }
 }
