@@ -2,7 +2,6 @@ use bevy::{
     asset::RenderAssetUsages,
     core_pipeline::schedule::camera_driver,
     ecs::component::Mutable,
-    mesh::MeshVertexBufferLayouts,
     prelude::*,
     render::{
         Extract, Render, RenderApp, RenderStartup, RenderSystems,
@@ -103,11 +102,14 @@ impl Plugin for MeshManipulationComputePlugin {
                 Render,
                 (
                     prepare_bind_group.in_set(RenderSystems::PrepareBindGroups),
-                    (update, mesh_manipulation)
-                        .chain()
-                        .in_set(RenderSystems::Prepare)
-                        .after(prepare_bind_group),
+                    update.in_set(RenderSystems::Prepare),
                 )
+                    .run_if(in_state(PlaygroundScene::MeshManipulation)),
+            )
+            .add_systems(
+                RenderGraph,
+                mesh_manipulation
+                    .before(camera_driver)
                     .run_if(in_state(PlaygroundScene::MeshManipulation)),
             );
     }
