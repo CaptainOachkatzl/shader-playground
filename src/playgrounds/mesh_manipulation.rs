@@ -97,21 +97,20 @@ impl Plugin for MeshManipulationComputePlugin {
                     extract_conditionally::<MeshManipulationUniforms>,
                 ),
             )
-            .add_systems(RenderStartup, init_pipeline)
-            .add_systems(
+            .add_systems(RenderStartup, init_pipeline);
+
+        add_state_scoped_systems!(
+            render_app,
+            PlaygroundScene::MeshManipulation,
+            RunInState(
                 Render,
                 (
                     prepare_bind_group.in_set(RenderSystems::PrepareBindGroups),
                     update.in_set(RenderSystems::Prepare),
                 )
-                    .run_if(in_state(PlaygroundScene::MeshManipulation)),
-            )
-            .add_systems(
-                RenderGraph,
-                mesh_manipulation
-                    .before(camera_driver)
-                    .run_if(in_state(PlaygroundScene::MeshManipulation)),
-            );
+            ),
+            RunInState(RenderGraph, mesh_manipulation.before(camera_driver))
+        );
     }
 }
 
