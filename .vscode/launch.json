@@ -11,7 +11,8 @@
             "program": "${workspaceFolder}\\target\\debug\\shader-playground.exe",
             "args": [],
             "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "preLaunchTask": "rust: cargo build"
         }
     ]
 }
