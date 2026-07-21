@@ -1,4 +1,3 @@
-
 struct MeshCreationUniforms {
     num_vertices: u32,
     num_indices: u32,
