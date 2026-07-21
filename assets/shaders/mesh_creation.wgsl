@@ -1,45 +1,33 @@
-@group(0) @binding(0) var<storage, read_write> vertices: array<Vertex>;
-
-@group(0) @binding(1) var<uniform> config: MeshCreationUniforms;
-
-@group(0) @binding(2) var<storage, read_write> debug: array<u32>;
-
-struct Vertex {
-    position_u: vec4<f32>,
-    normal_v: vec4<f32>,
-}
 
 struct MeshCreationUniforms {
-    subdivisions_x: u32,
-    subdivisions_z: u32,
-    vertex_count: u32,
-    animation_progress: f32,
+    num_vertices: u32,
+    vertex_start: u32,
+    vertex_end: u32,
+    index_start: u32,
+    index_end: u32,
 }
 
-const WORKGROUP_SIZE = 32;
+struct Vertex {
+    position: vec3<f32>,
+    normal: vec3<f32>,
+    uv: vec2<f32>,
+};
 
-@compute @workgroup_size(WORKGROUP_SIZE,WORKGROUP_SIZE,1)
-fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
+@group(0) @binding(0)
+var<storage, read> input_vertices: array<Vertex>;
 
-    let x = invocation_id.x;
-    let y = invocation_id.y;
-    let index = y * WORKGROUP_SIZE + x;
+@group(0) @binding(1)
+var<storage, read_write> output_vertices: array<Vertex>;
 
-    vertices[index].position_u.y = calc_height(x, 0.3);;
-}
+@group(0) @binding(2)
+var<storage, read_write> output_indices: array<u32>;
 
-@compute @workgroup_size(WORKGROUP_SIZE,WORKGROUP_SIZE,1)
-fn update(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
-    let x = invocation_id.x;
-    let y = invocation_id.y;
-    let index = y * WORKGROUP_SIZE + x;
+@group(0) @binding(3)
+var<uniform> config: MeshCreationUniforms;
 
-    vertices[index].position_u.y = calc_height(x, 0.1);
-}
+@group(0) @binding(4)
+var<storage, read_write> debug: array<u32>;
 
-fn calc_height(x: u32, amplitude: f32) -> f32 {
-    const PI_2 = 2 * 3.1415;
-    const wave_count = 3;
-    let x_norm = f32(x) / f32(WORKGROUP_SIZE);
-    return amplitude * sin(PI_2 * x_norm * wave_count + PI_2 * config.animation_progress);
+@compute @workgroup_size(1,1,1)
+fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
 }

@@ -5,6 +5,7 @@ use bevy::{
     prelude::*,
     render::{
         Extract, Render, RenderApp, RenderStartup, RenderSystems,
+        extract_component::ExtractComponent,
         extract_resource::ExtractResource,
         mesh::allocator::MeshAllocator,
         render_resource::{
@@ -22,8 +23,8 @@ use crate::{playgrounds::PlaygroundScene, utils::extract_state};
 
 const SHADER_ASSET_PATH: &str = "shaders/mesh_creation.wgsl";
 
-const WORKGROUP_SIZE_X: u32 = 32;
-const WORKGROUP_SIZE_Y: u32 = 32;
+const WORKGROUP_SIZE_X: u32 = 1;
+const WORKGROUP_SIZE_Y: u32 = 1;
 
 pub struct MeshCreationPlugin;
 
@@ -60,6 +61,9 @@ fn init_mesh(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
     commands.insert_resource(MeshData { mesh_handle });
 }
 
+#[derive(Component, Default, Clone, Copy, ExtractComponent)]
+struct Deformable;
+
 fn setup(
     mut commands: Commands,
     mesh_data: Res<MeshData>,
@@ -69,17 +73,18 @@ fn setup(
     let mesh_handle = mesh_data.mesh_handle.clone();
 
     let scene = bsn_list! {
-            DespawnOnExit<PlaygroundScene>(PlaygroundScene::MeshCreation)
-            Mesh3d(mesh_handle)
-            MeshMaterial3d<StandardMaterial>(asset_value(Color::WHITE))
-            Transform,
+        Deformable
+        Mesh3d(mesh_handle)
+        MeshMaterial3d<StandardMaterial>(asset_value(Color::WHITE))
+        Transform
+        DespawnOnExit<PlaygroundScene>(PlaygroundScene::MeshCreation),
 
-            DespawnOnExit<PlaygroundScene>(PlaygroundScene::MeshCreation)
-            PointLight {
-                shadow_maps_enabled: true,
-                intensity: 2_000_000.0,
-            }
-            Transform::from_xyz(4.0, 8.0, 4.0),
+        PointLight {
+            shadow_maps_enabled: true,
+            intensity: 2_000_000.0,
+        }
+        Transform::from_xyz(4.0, 8.0, 4.0)
+        DespawnOnExit<PlaygroundScene>(PlaygroundScene::MeshCreation),
     };
 
     commands.spawn_scene_list(scene);
@@ -102,18 +107,12 @@ impl Plugin for MeshCreationComputePlugin {
                     extract_conditionally::<MeshCreationUniforms>,
                 ),
             )
-            .add_systems(RenderStartup, init_pipeline);
+            .add_systems(RenderStartup, (init_pipeline, init_debug_buffer));
 
         add_state_scoped_systems!(
             render_app,
             PlaygroundScene::MeshCreation,
-            RunInState(
-                Render,
-                (
-                    prepare_bind_group.in_set(RenderSystems::PrepareBindGroups),
-                    poll_pipeline_loading.in_set(RenderSystems::Prepare),
-                )
-            ),
+            RunInState(Render, poll_pipeline_loading.in_set(RenderSystems::Prepare)),
             RunInState(RenderGraph, execute_pipeline.before(camera_driver))
         );
     }
@@ -185,9 +184,6 @@ struct Vertex {
     uv: Vec2,
 }
 
-#[derive(Resource)]
-struct MeshCreationBindGroups(BindGroup);
-
 #[derive(Resource, Clone)]
 struct DebugBuffer {
     buffer: Buffer,
@@ -198,13 +194,14 @@ fn init_pipeline(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     pipeline_cache: Res<PipelineCache>,
-    render_device: Res<RenderDevice>,
 ) {
     let mesh_bind_group_layout = BindGroupLayoutDescriptor::new(
         "MeshData",
         &BindGroupLayoutEntries::sequential(
             ShaderStages::COMPUTE,
             (
+                storage_buffer::<Vec<Vertex>>(false),
+                storage_buffer::<Vec<Vertex>>(false),
                 storage_buffer::<Vec<Vertex>>(false),
                 uniform_buffer::<MeshCreationUniforms>(false),
                 storage_buffer::<u32>(false),
@@ -215,7 +212,7 @@ fn init_pipeline(
     let pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
         layout: vec![mesh_bind_group_layout.clone()],
         shader: shader.clone(),
-        entry_point: Some(Cow::from("init")),
+        entry_point: Some(Cow::from("main")),
         ..default()
     });
 
@@ -223,7 +220,9 @@ fn init_pipeline(
         mesh_bind_group_layout,
         pipeline,
     });
+}
 
+fn init_debug_buffer(mut commands: Commands, render_device: Res<RenderDevice>) {
     let debug_buffer = render_device.create_buffer(&BufferDescriptor {
         label: Some("debug buffer"),
         size: 4,
@@ -242,49 +241,6 @@ fn init_pipeline(
         buffer: debug_buffer,
         readback: debug_readback,
     });
-}
-
-fn prepare_bind_group(
-    mut commands: Commands,
-    pipeline: Res<MeshCreationPipeline>,
-    mesh_allocator: Res<MeshAllocator>,
-    mesh_data: Res<MeshData>,
-    uniforms: Res<MeshCreationUniforms>,
-    debug_buffer: Res<DebugBuffer>,
-    render_device: Res<RenderDevice>,
-    pipeline_cache: Res<PipelineCache>,
-    queue: Res<RenderQueue>,
-) {
-    let vertex_slice = mesh_allocator
-        .mesh_vertex_slice(&mesh_data.mesh_handle.id())
-        .unwrap();
-
-    let vertex_slice_stride = size_of::<Vertex>() as u64;
-    let vertex_slice_size =
-        (vertex_slice.range.end - vertex_slice.range.start) as u64 * vertex_slice_stride;
-    let vertex_slice_offset = vertex_slice.range.start as u64 * vertex_slice_stride;
-
-    let mut uniform_buffer = UniformBuffer::from(uniforms.into_inner());
-    uniform_buffer.write_buffer(&render_device, &queue);
-
-    let bind_group = render_device.create_bind_group(
-        Some("mesh creation bind group"),
-        &pipeline_cache.get_bind_group_layout(&pipeline.mesh_bind_group_layout),
-        &BindGroupEntries::sequential((
-            BindingResource::Buffer(BufferBinding {
-                buffer: vertex_slice.buffer,
-                offset: vertex_slice_offset,
-                size: NonZero::new(vertex_slice_size),
-            }),
-            &uniform_buffer,
-            BindingResource::Buffer(BufferBinding {
-                buffer: &debug_buffer.buffer,
-                offset: 0,
-                size: NonZero::new(4),
-            }),
-        )),
-    );
-    commands.insert_resource(MeshCreationBindGroups(bind_group));
 }
 
 #[derive(Resource)]
@@ -328,29 +284,73 @@ fn poll_pipeline_loading(
 
 fn execute_pipeline(
     mut render_context: RenderContext,
-    bind_groups: Res<MeshCreationBindGroups>,
+    queue: Res<RenderQueue>,
     pipeline_cache: Res<PipelineCache>,
     pipeline: Res<MeshCreationPipeline>,
+    mesh_allocator: Res<MeshAllocator>,
+    mesh_data: Res<MeshData>,
+    uniforms: Res<MeshCreationUniforms>,
     mut state: ResMut<MeshCreationState>,
     #[allow(unused)] debug_buffer: Res<DebugBuffer>,
 ) {
-    // select the pipeline based on the current state
-    match *state {
-        MeshCreationState::Execute => {
-            let mut pass = render_context
-                .command_encoder()
-                .begin_compute_pass(&ComputePassDescriptor::default());
-
-            let mesh_creation_pipeline = pipeline_cache
-                .get_compute_pipeline(pipeline.pipeline)
-                .unwrap();
-            pass.set_bind_group(0, &bind_groups.0, &[]);
-            pass.set_pipeline(mesh_creation_pipeline);
-            pass.dispatch_workgroups(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1);
-            *state = MeshCreationState::Finished;
-        }
-        _ => {}
+    if *state != MeshCreationState::Execute {
+        return;
     }
+    let render_device = render_context.render_device();
+
+    let input_vertex_slice = mesh_allocator
+        .mesh_vertex_slice(&mesh_data.mesh_handle.id())
+        .unwrap();
+
+    let input_stride = size_of::<Vertex>() as u64;
+    let input_size =
+        (input_vertex_slice.range.end - input_vertex_slice.range.start) as u64 * input_stride;
+    let input_offset = input_vertex_slice.range.start as u64 * input_stride;
+
+    let mut uniform_buffer = UniformBuffer::from(uniforms.into_inner());
+    uniform_buffer.write_buffer(&render_device, &queue);
+
+    let output_vertex_buffer = render_device.create_buffer(&BufferDescriptor {
+        label: Some("output vertex buffer"),
+        size: 1024,
+        usage: BufferUsages::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let output_index_buffer = render_device.create_buffer(&BufferDescriptor {
+        label: Some("output index buffer"),
+        size: 1024,
+        usage: BufferUsages::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let bind_group = render_device.create_bind_group(
+        Some("mesh creation bind group"),
+        &pipeline_cache.get_bind_group_layout(&pipeline.mesh_bind_group_layout),
+        &BindGroupEntries::sequential((
+            BindingResource::Buffer(BufferBinding {
+                buffer: input_vertex_slice.buffer,
+                offset: input_offset,
+                size: NonZero::new(input_size),
+            }),
+            output_vertex_buffer.as_entire_binding(),
+            output_index_buffer.as_entire_binding(),
+            &uniform_buffer,
+            debug_buffer.buffer.as_entire_binding(),
+        )),
+    );
+
+    let mut pass = render_context
+        .command_encoder()
+        .begin_compute_pass(&ComputePassDescriptor::default());
+
+    let mesh_creation_pipeline = pipeline_cache
+        .get_compute_pipeline(pipeline.pipeline)
+        .unwrap();
+    pass.set_bind_group(0, &bind_group, &[]);
+    pass.set_pipeline(mesh_creation_pipeline);
+    pass.dispatch_workgroups(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1);
+    *state = MeshCreationState::Finished;
 
     //print_shader_debug_value(&mut render_context, &debug_buffer);
 }
