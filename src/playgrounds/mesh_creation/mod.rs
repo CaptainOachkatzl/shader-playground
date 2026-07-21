@@ -108,8 +108,12 @@ fn setup(
 
     let mut mesh = Cuboid::default().mesh().build();
     mesh.asset_usage = RenderAssetUsages::RENDER_WORLD;
-    println!("vertex count: {:?}", mesh.count_vertices());
-    println!("index count: {:?}", mesh.indices().map(|v| v.len()));
+
+    let mut uniforms = MeshCreationUniforms::default();
+    uniforms.num_vertices = mesh.count_vertices() as u32;
+    uniforms.num_indices = mesh.indices().map(|v| v.len() as u32).unwrap_or(0);
+    commands.insert_resource(uniforms);
+
     let mesh_handle = meshes.add(mesh);
 
     let scene = bsn_list! {
@@ -210,10 +214,15 @@ fn extract_conditionally<R: ExtractResource<(), Mutability = Mutable>>(
 #[derive(Resource, Default, Debug, Clone, ExtractResource, ShaderType)]
 struct MeshCreationUniforms {
     num_vertices: u32,
-    vertex_start: u32,
-    vertex_end: u32,
-    index_start: u32,
-    index_end: u32,
+    num_indices: u32,
+    input_vertex_start: u32,
+    input_vertex_end: u32,
+    input_index_start: u32,
+    input_index_end: u32,
+    output_vertex_start: u32,
+    output_vertex_end: u32,
+    output_index_start: u32,
+    output_index_end: u32,
 }
 
 #[derive(ShaderType)]
@@ -239,8 +248,6 @@ fn init_pipeline(
         &BindGroupLayoutEntries::sequential(
             ShaderStages::COMPUTE,
             (
-                storage_buffer::<Vec<Vertex>>(false),
-                storage_buffer::<Vec<u32>>(false),
                 storage_buffer::<Vec<Vertex>>(false),
                 storage_buffer::<Vec<u32>>(false),
                 uniform_buffer::<MeshCreationUniforms>(false),
@@ -342,38 +349,41 @@ fn execute_pipeline(
     {
         let render_device = render_context.render_device();
 
+        let mut uniforms = uniforms.clone();
+
         let input_vertex_slice = mesh_allocator
             .mesh_vertex_slice(&old_mesh_handle.id())
             .unwrap();
-        let input_vertex_buffer = buffer_binding_resource_from_slice::<Vertex>(&input_vertex_slice);
+        uniforms.input_vertex_start = input_vertex_slice.range.start;
+        uniforms.input_vertex_end = input_vertex_slice.range.end;
 
         let input_index_slice = mesh_allocator
             .mesh_index_slice(&old_mesh_handle.id())
             .unwrap();
-        let input_index_buffer = buffer_binding_resource_from_slice::<u32>(&input_index_slice);
+        uniforms.input_index_start = input_index_slice.range.start;
+        uniforms.input_index_end = input_index_slice.range.end;
 
         let output_vertex_slice = mesh_allocator
             .mesh_vertex_slice(&new_mesh_handle.id())
             .unwrap();
-        let output_vertex_buffer =
-            buffer_binding_resource_from_slice::<Vertex>(&output_vertex_slice);
+        uniforms.output_vertex_start = output_vertex_slice.range.start;
+        uniforms.output_vertex_end = output_vertex_slice.range.end;
 
         let output_index_slice = mesh_allocator
             .mesh_index_slice(&new_mesh_handle.id())
             .unwrap();
-        let output_index_buffer = buffer_binding_resource_from_slice::<u32>(&output_index_slice);
+        uniforms.output_index_start = output_index_slice.range.start;
+        uniforms.output_index_end = output_index_slice.range.end;
 
-        let mut uniform_buffer = UniformBuffer::from(uniforms.as_ref().clone());
+        let mut uniform_buffer = UniformBuffer::from(uniforms);
         uniform_buffer.write_buffer(&render_device, &queue);
 
         let bind_group = render_device.create_bind_group(
             Some("mesh creation bind group"),
             &pipeline_cache.get_bind_group_layout(&pipeline.mesh_bind_group_layout),
             &BindGroupEntries::sequential((
-                input_vertex_buffer,
-                input_index_buffer,
-                output_vertex_buffer,
-                output_index_buffer,
+                input_vertex_slice.buffer.as_entire_buffer_binding(),
+                input_index_slice.buffer.as_entire_buffer_binding(),
                 &uniform_buffer,
                 debug_buffer.buffer.as_entire_binding(),
             )),
@@ -392,18 +402,6 @@ fn execute_pipeline(
 
         //print_shader_debug_value(&mut render_context, &debug_buffer);
     }
-}
-
-fn buffer_binding_resource_from_slice<'a, T>(slice: &'a MeshBufferSlice) -> BindingResource<'a> {
-    let stride = size_of::<T>() as u64;
-    let size = (slice.range.end - slice.range.start) as u64 * stride;
-    let offset = slice.range.start as u64 * stride;
-    println!("-------------------------------\nstride: {stride}\nsize: {size}\noffset: {offset}");
-    BindingResource::Buffer(BufferBinding {
-        buffer: slice.buffer,
-        offset,
-        size: NonZero::new(size),
-    })
 }
 
 #[allow(unused)]
