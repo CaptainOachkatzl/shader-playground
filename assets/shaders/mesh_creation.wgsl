@@ -32,9 +32,15 @@ var<storage, read_write> debug: array<u32>;
 
 @compute @workgroup_size(1,1,1)
 fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
-    for (var i = 0; i < 24; i++) {
+    for (var i = 0u; i < config.num_indices; i++) {
+        let input = config.input_index_start + i;
+        let output = config.output_index_start + i;
+        indices[output] = indices[input];
     }
 
-    for (var i = 0; i < 36; i++) {
+    for (var i = 0u; i < config.num_vertices; i++) {
+        let input = config.input_vertex_start + i;
+        let output = config.output_vertex_start + i;
+        indices[output] = indices[input];
     }
 }

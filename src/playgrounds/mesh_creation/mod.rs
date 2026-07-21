@@ -8,7 +8,7 @@ use bevy::{
         Extract, Render, RenderApp, RenderStartup, RenderSystems,
         extract_component::ExtractComponent,
         extract_resource::ExtractResource,
-        mesh::allocator::{MeshAllocator, MeshAllocatorSettings, MeshBufferSlice},
+        mesh::allocator::{MeshAllocator, MeshAllocatorSettings},
         render_resource::{
             binding_types::{storage_buffer, uniform_buffer},
             *,
@@ -17,7 +17,7 @@ use bevy::{
     },
     shader::ShaderCacheError,
 };
-use std::{borrow::Cow, num::NonZero};
+use std::borrow::Cow;
 use xs_bevy_state_scoped_systems::add_state_scoped_systems;
 
 use crate::{playgrounds::PlaygroundScene, utils::extract_state};
@@ -150,7 +150,7 @@ impl Plugin for MeshCreationComputePlugin {
                 ExtractSchedule,
                 (
                     handle_messages,
-                    debug_extract,
+                    extract_deform,
                     extract_state::<PlaygroundScene>,
                     extract_conditionally::<MeshCreationUniforms>,
                 ),
@@ -166,7 +166,7 @@ impl Plugin for MeshCreationComputePlugin {
     }
 }
 
-fn debug_extract(mut commands: Commands, query: Extract<Query<&Deform>>) {
+fn extract_deform(mut commands: Commands, query: Extract<Query<&Deform>>) {
     for deform in &query {
         commands.spawn(deform.clone());
     }
@@ -328,6 +328,7 @@ fn poll_pipeline_loading(
 }
 
 fn execute_pipeline(
+    mut commands: Commands,
     mut render_context: RenderContext,
     queue: Res<RenderQueue>,
     pipeline_cache: Res<PipelineCache>,
@@ -335,18 +336,23 @@ fn execute_pipeline(
     mesh_allocator: Res<MeshAllocator>,
     uniforms: Res<MeshCreationUniforms>,
     state: Res<MeshCreationState>,
-    deform_q: Query<&Deform>,
+    deform_q: Query<(Entity, &Deform)>,
     #[allow(unused)] debug_buffer: Res<DebugBuffer>,
 ) {
     if *state != MeshCreationState::Ready {
         return;
     }
 
-    for Deform {
-        old_mesh_handle,
-        new_mesh_handle,
-    } in deform_q
+    for (
+        entity,
+        Deform {
+            old_mesh_handle,
+            new_mesh_handle,
+        },
+    ) in deform_q
     {
+        commands.entity(entity).despawn();
+
         let render_device = render_context.render_device();
 
         let mut uniforms = uniforms.clone();
