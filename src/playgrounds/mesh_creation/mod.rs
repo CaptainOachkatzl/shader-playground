@@ -381,6 +381,17 @@ fn execute_pipeline(
         uniforms.output_index_start = output_index_slice.range.start;
         uniforms.output_index_end = output_index_slice.range.end;
 
+        //println!("{:#?}", uniforms);
+        assert_eq!(
+            input_vertex_slice.buffer.id(),
+            output_vertex_slice.buffer.id()
+        );
+
+        assert_eq!(
+            input_index_slice.buffer.id(),
+            output_index_slice.buffer.id()
+        );
+
         let mut uniform_buffer = UniformBuffer::from(uniforms);
         uniform_buffer.write_buffer(&render_device, &queue);
 
@@ -405,9 +416,9 @@ fn execute_pipeline(
         pass.set_bind_group(0, &bind_group, &[]);
         pass.set_pipeline(mesh_creation_pipeline);
         pass.dispatch_workgroups(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1);
-
-        //print_shader_debug_value(&mut render_context, &debug_buffer);
     }
+
+    //print_shader_debug_value(&mut render_context, &debug_buffer);
 }
 
 #[allow(unused)]
