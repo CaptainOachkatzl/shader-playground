@@ -2,12 +2,13 @@ use bevy::{
     asset::RenderAssetUsages,
     core_pipeline::schedule::camera_driver,
     ecs::component::Mutable,
+    mesh::Indices,
     prelude::*,
     render::{
         Extract, Render, RenderApp, RenderStartup, RenderSystems,
         extract_component::ExtractComponent,
         extract_resource::ExtractResource,
-        mesh::allocator::MeshAllocator,
+        mesh::allocator::{MeshAllocator, MeshAllocatorSettings, MeshBufferSlice},
         render_resource::{
             binding_types::{storage_buffer, uniform_buffer},
             *,
@@ -36,10 +37,14 @@ impl Plugin for MeshCreationPlugin {
         add_state_scoped_systems!(
             app,
             PlaygroundScene::MeshCreation,
-            OnEnter((init_mesh, setup, bevy::asset::handle_internal_asset_events,).chain()),
+            OnEnter((setup, bevy::asset::handle_internal_asset_events,).chain()),
             RunInState(
                 Update,
-                send_mesh_deform_message.run_if(trigger_deformation_pressed)
+                (
+                    remove_deform_component,
+                    insert_deform_component.run_if(trigger_deformation_pressed)
+                )
+                    .chain()
             ),
         );
     }
@@ -49,28 +54,63 @@ fn trigger_deformation_pressed(keyboard: Res<ButtonInput<KeyCode>>) -> bool {
     keyboard.just_pressed(KeyCode::Space)
 }
 
-fn send_mesh_deform_message(mut msg_queue: MessageWriter<RenderPluginMessage>) {
-    msg_queue.write(RenderPluginMessage(RenderPluginActions::StartDeformation));
+fn insert_deform_component(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    deformables: Query<(Entity, &mut Mesh3d), With<Deformable>>,
+) {
+    for (entity, mut mesh_3d) in deformables {
+        let empty_mesh = {
+            let mut mesh = Mesh::new(
+                PrimitiveTopology::TriangleList,
+                RenderAssetUsages::RENDER_WORLD,
+            )
+            .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vec![[0.; 3]; 50])
+            .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.; 3]; 50])
+            .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.; 2]; 50])
+            .with_inserted_indices(Indices::U32(vec![0; 50]));
+
+            mesh.asset_usage = RenderAssetUsages::RENDER_WORLD;
+            mesh
+        };
+
+        let handle = meshes.add(empty_mesh);
+        let old_handle = mesh_3d.0.clone();
+        mesh_3d.0 = handle.clone();
+        commands.entity(entity).insert(Deform {
+            old_mesh_handle: old_handle,
+            new_mesh_handle: handle,
+        });
+    }
 }
 
-fn init_mesh(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
-    let mut mesh = Cuboid::default().mesh().build();
-    mesh.asset_usage = RenderAssetUsages::RENDER_WORLD;
-    let mesh_handle = meshes.add(mesh);
-
-    commands.insert_resource(MeshData { mesh_handle });
+fn remove_deform_component(mut commands: Commands, deformables: Query<Entity, With<Deform>>) {
+    for entity in deformables {
+        commands.entity(entity).remove::<Deform>();
+    }
 }
 
-#[derive(Component, Default, Clone, Copy, ExtractComponent)]
+#[derive(Component, Default, Clone)]
 struct Deformable;
+
+#[derive(Component, Default, Clone, ExtractComponent)]
+struct Deform {
+    old_mesh_handle: Handle<Mesh>,
+    new_mesh_handle: Handle<Mesh>,
+}
 
 fn setup(
     mut commands: Commands,
-    mesh_data: Res<MeshData>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut msg_queue: MessageWriter<RenderPluginMessage>,
 ) {
     commands.init_resource::<MeshCreationUniforms>();
-    let mesh_handle = mesh_data.mesh_handle.clone();
+
+    let mut mesh = Cuboid::default().mesh().build();
+    mesh.asset_usage = RenderAssetUsages::RENDER_WORLD;
+    println!("vertex count: {:?}", mesh.count_vertices());
+    println!("index count: {:?}", mesh.indices().map(|v| v.len()));
+    let mesh_handle = meshes.add(mesh);
 
     let scene = bsn_list! {
         Deformable
@@ -98,12 +138,16 @@ impl Plugin for MeshCreationComputePlugin {
         let render_app = app.sub_app_mut(RenderApp);
         render_app
             .init_resource::<MeshCreationState>()
+            .insert_resource(MeshAllocatorSettings {
+                extra_buffer_usages: BufferUsages::STORAGE,
+                ..Default::default()
+            })
             .add_systems(
                 ExtractSchedule,
                 (
                     handle_messages,
+                    debug_extract,
                     extract_state::<PlaygroundScene>,
-                    extract_conditionally::<MeshData>,
                     extract_conditionally::<MeshCreationUniforms>,
                 ),
             )
@@ -118,9 +162,14 @@ impl Plugin for MeshCreationComputePlugin {
     }
 }
 
+fn debug_extract(mut commands: Commands, query: Extract<Query<&Deform>>) {
+    for deform in &query {
+        commands.spawn(deform.clone());
+    }
+}
+
 enum RenderPluginActions {
     Reset,
-    StartDeformation,
 }
 
 #[derive(Message)]
@@ -131,13 +180,8 @@ fn handle_messages(
     mut mesh_creation_state: ResMut<MeshCreationState>,
 ) {
     for message in deformation_messages.read() {
-        match message.0 {
+        match &message.0 {
             RenderPluginActions::Reset => *mesh_creation_state = MeshCreationState::Loading,
-            RenderPluginActions::StartDeformation => {
-                if *mesh_creation_state == MeshCreationState::Waiting {
-                    *mesh_creation_state = MeshCreationState::Execute;
-                }
-            }
         }
     }
 }
@@ -161,11 +205,6 @@ fn extract_conditionally<R: ExtractResource<(), Mutability = Mutable>>(
             commands.insert_resource(R::extract_resource(main_resource));
         }
     }
-}
-
-#[derive(Resource, Clone, ExtractResource)]
-struct MeshData {
-    mesh_handle: Handle<Mesh>,
 }
 
 #[derive(Resource, Default, Debug, Clone, ExtractResource, ShaderType)]
@@ -201,8 +240,9 @@ fn init_pipeline(
             ShaderStages::COMPUTE,
             (
                 storage_buffer::<Vec<Vertex>>(false),
+                storage_buffer::<Vec<u32>>(false),
                 storage_buffer::<Vec<Vertex>>(false),
-                storage_buffer::<Vec<Vertex>>(false),
+                storage_buffer::<Vec<u32>>(false),
                 uniform_buffer::<MeshCreationUniforms>(false),
                 storage_buffer::<u32>(false),
             ),
@@ -253,9 +293,7 @@ struct MeshCreationPipeline {
 enum MeshCreationState {
     #[default]
     Loading,
-    Waiting,
-    Execute,
-    Finished,
+    Ready,
 }
 
 fn poll_pipeline_loading(
@@ -268,7 +306,7 @@ fn poll_pipeline_loading(
         MeshCreationState::Loading => {
             match pipeline_cache.get_compute_pipeline_state(pipeline.pipeline) {
                 CachedPipelineState::Ok(_) => {
-                    *state = MeshCreationState::Waiting;
+                    *state = MeshCreationState::Ready;
                 }
                 // If the shader hasn't loaded yet, just wait.
                 CachedPipelineState::Err(ShaderCacheError::ShaderNotLoaded(_)) => {}
@@ -288,71 +326,84 @@ fn execute_pipeline(
     pipeline_cache: Res<PipelineCache>,
     pipeline: Res<MeshCreationPipeline>,
     mesh_allocator: Res<MeshAllocator>,
-    mesh_data: Res<MeshData>,
     uniforms: Res<MeshCreationUniforms>,
-    mut state: ResMut<MeshCreationState>,
+    state: Res<MeshCreationState>,
+    deform_q: Query<&Deform>,
     #[allow(unused)] debug_buffer: Res<DebugBuffer>,
 ) {
-    if *state != MeshCreationState::Execute {
+    if *state != MeshCreationState::Ready {
         return;
     }
-    let render_device = render_context.render_device();
 
-    let input_vertex_slice = mesh_allocator
-        .mesh_vertex_slice(&mesh_data.mesh_handle.id())
-        .unwrap();
+    for Deform {
+        old_mesh_handle,
+        new_mesh_handle,
+    } in deform_q
+    {
+        let render_device = render_context.render_device();
 
-    let input_stride = size_of::<Vertex>() as u64;
-    let input_size =
-        (input_vertex_slice.range.end - input_vertex_slice.range.start) as u64 * input_stride;
-    let input_offset = input_vertex_slice.range.start as u64 * input_stride;
+        let input_vertex_slice = mesh_allocator
+            .mesh_vertex_slice(&old_mesh_handle.id())
+            .unwrap();
+        let input_vertex_buffer = buffer_binding_resource_from_slice::<Vertex>(&input_vertex_slice);
 
-    let mut uniform_buffer = UniformBuffer::from(uniforms.into_inner());
-    uniform_buffer.write_buffer(&render_device, &queue);
+        let input_index_slice = mesh_allocator
+            .mesh_index_slice(&old_mesh_handle.id())
+            .unwrap();
+        let input_index_buffer = buffer_binding_resource_from_slice::<u32>(&input_index_slice);
 
-    let output_vertex_buffer = render_device.create_buffer(&BufferDescriptor {
-        label: Some("output vertex buffer"),
-        size: 1024,
-        usage: BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
+        let output_vertex_slice = mesh_allocator
+            .mesh_vertex_slice(&new_mesh_handle.id())
+            .unwrap();
+        let output_vertex_buffer =
+            buffer_binding_resource_from_slice::<Vertex>(&output_vertex_slice);
 
-    let output_index_buffer = render_device.create_buffer(&BufferDescriptor {
-        label: Some("output index buffer"),
-        size: 1024,
-        usage: BufferUsages::STORAGE,
-        mapped_at_creation: false,
-    });
+        let output_index_slice = mesh_allocator
+            .mesh_index_slice(&new_mesh_handle.id())
+            .unwrap();
+        let output_index_buffer = buffer_binding_resource_from_slice::<u32>(&output_index_slice);
 
-    let bind_group = render_device.create_bind_group(
-        Some("mesh creation bind group"),
-        &pipeline_cache.get_bind_group_layout(&pipeline.mesh_bind_group_layout),
-        &BindGroupEntries::sequential((
-            BindingResource::Buffer(BufferBinding {
-                buffer: input_vertex_slice.buffer,
-                offset: input_offset,
-                size: NonZero::new(input_size),
-            }),
-            output_vertex_buffer.as_entire_binding(),
-            output_index_buffer.as_entire_binding(),
-            &uniform_buffer,
-            debug_buffer.buffer.as_entire_binding(),
-        )),
-    );
+        let mut uniform_buffer = UniformBuffer::from(uniforms.as_ref().clone());
+        uniform_buffer.write_buffer(&render_device, &queue);
 
-    let mut pass = render_context
-        .command_encoder()
-        .begin_compute_pass(&ComputePassDescriptor::default());
+        let bind_group = render_device.create_bind_group(
+            Some("mesh creation bind group"),
+            &pipeline_cache.get_bind_group_layout(&pipeline.mesh_bind_group_layout),
+            &BindGroupEntries::sequential((
+                input_vertex_buffer,
+                input_index_buffer,
+                output_vertex_buffer,
+                output_index_buffer,
+                &uniform_buffer,
+                debug_buffer.buffer.as_entire_binding(),
+            )),
+        );
 
-    let mesh_creation_pipeline = pipeline_cache
-        .get_compute_pipeline(pipeline.pipeline)
-        .unwrap();
-    pass.set_bind_group(0, &bind_group, &[]);
-    pass.set_pipeline(mesh_creation_pipeline);
-    pass.dispatch_workgroups(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1);
-    *state = MeshCreationState::Finished;
+        let mut pass = render_context
+            .command_encoder()
+            .begin_compute_pass(&ComputePassDescriptor::default());
 
-    //print_shader_debug_value(&mut render_context, &debug_buffer);
+        let mesh_creation_pipeline = pipeline_cache
+            .get_compute_pipeline(pipeline.pipeline)
+            .unwrap();
+        pass.set_bind_group(0, &bind_group, &[]);
+        pass.set_pipeline(mesh_creation_pipeline);
+        pass.dispatch_workgroups(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1);
+
+        //print_shader_debug_value(&mut render_context, &debug_buffer);
+    }
+}
+
+fn buffer_binding_resource_from_slice<'a, T>(slice: &'a MeshBufferSlice) -> BindingResource<'a> {
+    let stride = size_of::<T>() as u64;
+    let size = (slice.range.end - slice.range.start) as u64 * stride;
+    let offset = slice.range.start as u64 * stride;
+    println!("-------------------------------\nstride: {stride}\nsize: {size}\noffset: {offset}");
+    BindingResource::Buffer(BufferBinding {
+        buffer: slice.buffer,
+        offset,
+        size: NonZero::new(size),
+    })
 }
 
 #[allow(unused)]
