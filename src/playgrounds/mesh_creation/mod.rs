@@ -127,7 +127,7 @@ fn setup(
             shadow_maps_enabled: true,
             intensity: 2_000_000.0,
         }
-        Transform::from_xyz(4.0, 8.0, 4.0)
+        Transform::from_xyz(3.0, 5.0, 4.0)
         DespawnOnExit<PlaygroundScene>(PlaygroundScene::MeshCreation),
     };
 
