@@ -3,6 +3,7 @@
 mod camera;
 mod playgrounds;
 mod settings;
+mod utils;
 
 #[allow(unused)]
 use bevy::{
@@ -20,6 +21,7 @@ use crate::{
         compute_shader::ComputeShaderPlugin,
         custom_render_phase::CustomRenderPhasePlugin,
         hologram::{HologramMaterial, HologramPlugin},
+        mesh_creation::MeshCreationPlugin,
         mesh_manipulation::MeshManipulationPlugin,
         paint_cube_face::{PaintCubeFacePlugin, PaintFaceMaterial},
         rainbow_cube::{RainbowCubePlugin, RainbowMaterial},
@@ -58,6 +60,7 @@ pub fn run() {
         SpecializedPipelinePlugin,
         ComputeShaderPlugin,
         MeshManipulationPlugin,
+        MeshCreationPlugin,
     ))
     .add_plugins((
         MaterialPlugin::<BasicColoringMaterial>::default(),
