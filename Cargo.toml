@@ -10,7 +10,7 @@ strum = { version = "*", features = ["derive"] }
 indexmap = "*"
 nonmax = "*"
 rand = "*"
-xs_bevy_state_scoped_systems = { git = "https://github.com/XSWare/xs_bevy_state_scoped_systems" }
+xs-bevy-state-scoped-systems = { git = "https://github.com/XSWare/xs-bevy-state-scoped-systems" }
 
 [build-dependencies]
 copy_to_output = "*"
