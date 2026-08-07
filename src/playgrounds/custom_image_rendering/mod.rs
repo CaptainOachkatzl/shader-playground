@@ -1,14 +1,14 @@
-use bevy::{
-    asset::Asset,
-    mesh::RectangleMeshBuilder,
-    prelude::*,
-    render::render_resource::AsBindGroup,
-    shader::ShaderRef,
-    sprite_render::{AlphaMode2d, Material2d, Material2dPlugin},
-};
+pub mod custom_rendering_material;
+
+use bevy::{mesh::RectangleMeshBuilder, prelude::*, sprite_render::Material2dPlugin};
 use xs_bevy_state_scoped_systems::add_state_scoped_systems;
 
-use crate::{camera::setup_3d_camera, playgrounds::PlaygroundScene};
+use crate::{
+    camera::setup_3d_camera,
+    playgrounds::{
+        PlaygroundScene, custom_image_rendering::custom_rendering_material::CustomRenderMaterial,
+    },
+};
 
 pub struct CustomImageRenderingPlugin;
 
@@ -46,23 +46,4 @@ fn setup(mut commands: Commands, camera_q: Query<Entity, With<Camera3d>>) {
     };
 
     commands.spawn_scene(scene);
-}
-
-const SHADER_PATH: &str = "shaders/custom_image_rendering.wgsl";
-
-#[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
-pub struct CustomRenderMaterial {}
-
-impl Material2d for CustomRenderMaterial {
-    // fn vertex_shader() -> ShaderRef {
-    //     SHADER_PATH.into()
-    // }
-
-    fn fragment_shader() -> ShaderRef {
-        SHADER_PATH.into()
-    }
-
-    fn alpha_mode(&self) -> AlphaMode2d {
-        AlphaMode2d::Blend
-    }
 }
