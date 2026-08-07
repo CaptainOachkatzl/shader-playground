@@ -7,6 +7,7 @@ pub mod rainbow_cube;
 pub mod specialized_pipeline;
 pub mod mesh_manipulation;
 pub mod mesh_creation;
+pub mod custom_image_rendering;
 
 use bevy::prelude::*;
 use strum::{EnumIter, IntoEnumIterator};
@@ -23,6 +24,7 @@ pub enum PlaygroundScene {
     ComputeShader,
     MeshManipulation,
     MeshCreation,
+    CustomImageRendering,
 }
 
 impl PlaygroundScene {
@@ -37,6 +39,7 @@ impl PlaygroundScene {
             PlaygroundScene::ComputeShader => KeyCode::Digit7,
             PlaygroundScene::MeshManipulation => KeyCode::Digit8,
             PlaygroundScene::MeshCreation => KeyCode::Digit9,
+            PlaygroundScene::CustomImageRendering => KeyCode::Digit0,
         }
     }
 }
