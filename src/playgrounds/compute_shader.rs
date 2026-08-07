@@ -19,7 +19,7 @@ use bevy::{
 use std::borrow::Cow;
 use xs_bevy_state_scoped_systems::add_state_scoped_systems;
 
-use crate::playgrounds::PlaygroundScene;
+use crate::{camera::setup_3d_camera, playgrounds::PlaygroundScene};
 
 const SHADER_ASSET_PATH: &str = "shaders/game_of_life.wgsl";
 
@@ -93,14 +93,6 @@ fn setup(
             ..default()
         },
         Transform::from_scale(Vec3::splat(DISPLAY_FACTOR as f32)),
-    ));
-}
-
-fn setup_3d_camera(mut commands: Commands) {
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(-6.0, 4.5, 0.).looking_at(Vec3::ZERO, Vec3::Y),
-        Msaa::Off,
     ));
 }
 
