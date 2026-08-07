@@ -19,6 +19,7 @@ use crate::{
         ScenePlugin,
         basic_coloring::{BasicColoringMaterial, BasicColoringPlugin},
         compute_shader::ComputeShaderPlugin,
+        custom_image_rendering::CustomImageRenderingPlugin,
         custom_render_phase::CustomRenderPhasePlugin,
         hologram::{HologramMaterial, HologramPlugin},
         mesh_creation::MeshCreationPlugin,
@@ -61,6 +62,7 @@ pub fn run() {
         ComputeShaderPlugin,
         MeshManipulationPlugin,
         MeshCreationPlugin,
+        CustomImageRenderingPlugin,
     ))
     .add_plugins((
         MaterialPlugin::<BasicColoringMaterial>::default(),
