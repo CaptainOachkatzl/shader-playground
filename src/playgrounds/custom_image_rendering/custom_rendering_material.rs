@@ -10,8 +10,7 @@ const SHADER_PATH: &str = "shaders/custom_image_rendering.wgsl";
 
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
 pub struct CustomRenderMaterial {
-    #[texture(0)]
-    #[sampler(1)]
+    #[texture(0, sample_type = "u_int")]
     pub data: Handle<Image>,
 }
 
@@ -35,7 +34,7 @@ impl CustomRenderMaterial {
             size,
             TextureDimension::D2,
             &data,
-            TextureFormat::R8Unorm,
+            TextureFormat::R8Uint,
             RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
         )
     }
