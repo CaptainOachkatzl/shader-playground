@@ -4,7 +4,7 @@ use bevy::{
     prelude::*,
     render::render_resource::AsBindGroup,
     shader::ShaderRef,
-    sprite_render::{AlphaMode2d, Material2d},
+    sprite_render::{AlphaMode2d, Material2d, Material2dPlugin},
 };
 use xs_bevy_state_scoped_systems::add_state_scoped_systems;
 
@@ -14,6 +14,7 @@ pub struct CustomImageRenderingPlugin;
 
 impl Plugin for CustomImageRenderingPlugin {
     fn build(&self, app: &mut App) {
+        app.add_plugins(Material2dPlugin::<CustomRenderMaterial>::default());
         add_state_scoped_systems!(
             app,
             PlaygroundScene::CustomImageRendering,
@@ -39,7 +40,7 @@ fn setup(mut commands: Commands, camera_q: Query<Entity, With<Camera3d>>) {
         DespawnOnExit<PlaygroundScene>(PlaygroundScene::CustomImageRendering)
         Children [
             Mesh2d(asset_value(RectangleMeshBuilder::new(200., 200.)))
-            MeshMaterial2d::<ColorMaterial>(asset_value(Color::WHITE)),
+            MeshMaterial2d::<CustomRenderMaterial>(asset_value(CustomRenderMaterial{})),
             Transform,
         ]
     };
@@ -53,9 +54,9 @@ const SHADER_PATH: &str = "shaders/custom_image_rendering.wgsl";
 pub struct CustomRenderMaterial {}
 
 impl Material2d for CustomRenderMaterial {
-    fn vertex_shader() -> ShaderRef {
-        SHADER_PATH.into()
-    }
+    // fn vertex_shader() -> ShaderRef {
+    //     SHADER_PATH.into()
+    // }
 
     fn fragment_shader() -> ShaderRef {
         SHADER_PATH.into()
