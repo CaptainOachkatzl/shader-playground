@@ -1,6 +1,10 @@
 pub mod custom_rendering_material;
 
-use bevy::{mesh::RectangleMeshBuilder, prelude::*, sprite_render::Material2dPlugin};
+use bevy::{
+    mesh::RectangleMeshBuilder,
+    prelude::*,
+    sprite_render::Material2dPlugin,
+};
 use xs_bevy_state_scoped_systems::add_state_scoped_systems;
 
 use crate::{
@@ -24,7 +28,11 @@ impl Plugin for CustomImageRenderingPlugin {
     }
 }
 
-fn setup(mut commands: Commands, camera_q: Query<Entity, With<Camera3d>>) {
+fn setup(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    camera_q: Query<Entity, With<Camera3d>>,
+) {
     if let Ok(cam_entity) = camera_q.single() {
         commands.entity(cam_entity).despawn();
     }
@@ -34,13 +42,17 @@ fn setup(mut commands: Commands, camera_q: Query<Entity, With<Camera3d>>) {
         DespawnOnExit(PlaygroundScene::CustomImageRendering),
     ));
 
+    let image_width = 200;
+    let image_height = 200;
+    let material = CustomRenderMaterial::new(&mut images, image_width, image_height);
+
     let scene = bsn! {
         Visibility::Visible
         Transform
         DespawnOnExit<PlaygroundScene>(PlaygroundScene::CustomImageRendering)
         Children [
-            Mesh2d(asset_value(RectangleMeshBuilder::new(200., 200.)))
-            MeshMaterial2d::<CustomRenderMaterial>(asset_value(CustomRenderMaterial{})),
+            Mesh2d(asset_value(RectangleMeshBuilder::new(image_width as f32, image_height as f32)))
+            MeshMaterial2d::<CustomRenderMaterial>(asset_value(material))
             Transform,
         ]
     };
